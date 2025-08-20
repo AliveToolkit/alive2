@@ -93,6 +93,7 @@ extern bool has_globals_diff_align;
 /// Whether the programs do memory accesses that load/store int/ptrs
 extern bool does_int_mem_access;
 extern bool does_ptr_mem_access;
+extern bool does_int_store;
 extern bool does_ptr_store;
 
 extern unsigned heap_block_alignment;

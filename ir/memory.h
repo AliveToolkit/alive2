@@ -132,18 +132,9 @@ class Memory {
     void print(std::ostream &os) const;
   };
 
-  enum DataType { DATA_NONE = 0, DATA_INT = 1, DATA_PTR = 2,
-                  DATA_ANY = DATA_INT | DATA_PTR };
-
   struct MemBlock {
     smt::expr val; // array: short offset -> Byte
     std::set<smt::expr> undef;
-    unsigned char type = DATA_ANY;
-
-    MemBlock() = default;
-    MemBlock(smt::expr &&val) : val(std::move(val)) {}
-    MemBlock(smt::expr &&val, DataType type)
-      : val(std::move(val)), type(type) {}
 
     std::weak_ordering operator<=>(const MemBlock &rhs) const;
   };
@@ -214,13 +205,9 @@ class Memory {
 
   std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
                          std::set<smt::expr> &undef, uint64_t align,
-                         bool left2right = true,
-                         DataType type = DATA_ANY);
+                         bool left2right = true);
   StateValue load(const Pointer &ptr, const Type &type,
                   std::set<smt::expr> &undef, uint64_t align);
-
-  DataType data_type(const std::vector<std::pair<unsigned, smt::expr>> &data,
-                     bool full_store) const;
 
   void store(const Pointer &ptr,
              const std::vector<std::pair<unsigned, smt::expr>> &data,

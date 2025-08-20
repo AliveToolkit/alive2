@@ -16,5 +16,3 @@ then:
 else:
   ret i8 0
 }
-
-; ERROR: Source is more defined than target
