@@ -3772,6 +3772,7 @@ MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
   bool ptr_access = hasPtr(t);
   ByteAccessInfo info;
   info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
+  info.doesIntStore     = !ptr_access & store;
   info.doesPtrStore     = ptr_access && store;
   info.doesPtrLoad      = ptr_access && !store;
   info.byteSize         = gcd(align, getCommonAccessSize(t));
@@ -3780,7 +3781,7 @@ MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
 }
 
 MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
-  return { true, true, true, true, byteSize, 0 };
+  return { true, true, true, true, true, byteSize, 0 };
 }
 
 
@@ -4319,7 +4320,9 @@ MemInstr::ByteAccessInfo Memset::getByteAccessInfo() const {
   unsigned byteSize = 1;
   if (auto bs = getInt(*bytes))
     byteSize = gcd(align, *bs);
-  return ByteAccessInfo::intOnly(byteSize);
+  auto info = ByteAccessInfo::intOnly(byteSize);
+  info.doesIntStore = true;
+  return info;
 }
 
 vector<Value*> Memset::operands() const {
@@ -4650,11 +4653,7 @@ StateValue Memcmp::toSMT(State &s) const {
     }
 
     expr val_eq = val1.forceCastToInt() == val2.forceCastToInt();
-
-    // allow null <-> 0 comparison
-    expr np
-      = (is_ptr1 == is_ptr2 || val1.isZero() || val2.isZero()) &&
-        !val1.isPoison() && !val2.isPoison();
+    expr np = !val1.isPoison() && !val2.isPoison();
 
     return { expr::mkIf(val_eq, zero, result_neq),
              std::move(np), {},

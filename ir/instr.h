@@ -694,6 +694,7 @@ public:
 
   struct ByteAccessInfo {
     bool hasIntByteAccess = false;
+    bool doesIntStore = false;
     bool doesPtrLoad = false;
     bool doesPtrStore = false;
     bool observesAddresses = false;

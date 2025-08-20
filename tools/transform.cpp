@@ -1035,12 +1035,14 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_global_size = UINT64_MAX;
 
   bool has_null_pointer = false;
-  has_int2ptr     = false;
-  bool has_ptr2int     = false;
+  has_int2ptr       = false;
+  bool has_ptr2int  = false;
+  bool has_ptr2addr = false;
   has_alloca       = false;
   has_fncall       = false;
   has_write_fncall = false;
   has_null_block   = false;
+  does_int_store   = false;
   does_ptr_store   = false;
   does_ptr_mem_access = false;
   does_int_mem_access = false;
@@ -1162,6 +1164,7 @@ static void calculateAndInitConstants(Transform &t) {
         cur_max_gep      = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
 
         auto info = mi->getByteAccessInfo();
+        does_int_store       |= info.doesIntStore;
         has_ptr_load         |= info.doesPtrLoad;
         does_ptr_store       |= info.doesPtrStore;
         does_int_mem_access  |= info.hasIntByteAccess;
@@ -1177,11 +1180,13 @@ static void calculateAndInitConstants(Transform &t) {
         has_alloca |= dynamic_cast<const Alloc*>(&i) != nullptr;
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
-                  isCast(ConversionOp::Ptr2Int, i)) {
+                 isCast(ConversionOp::Ptr2Int, i) ||
+                 isCast(ConversionOp::Ptr2Addr, i)) {
         max_alloc_size = max_access_size = cur_max_gep = loc_alloc_aligned_size
           = UINT64_MAX;
-        has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
-        has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
+        has_int2ptr  |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
+        has_ptr2int  |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
+        has_ptr2addr |= isCast(ConversionOp::Ptr2Addr, i) != nullptr;
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
         auto &t = bc->getType();
@@ -1234,7 +1239,8 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
-  observes_addresses |= has_int2ptr || has_ptr2int;
+  observes_addresses |= has_int2ptr || has_ptr2int || has_ptr2addr ||
+                        does_int_mem_access /* ptr -> int load punning */;
   // condition can happen with ptr2int(poison) or e.g., load poison
   if ((has_ptr2int || does_mem_access) && num_nonlocals == 0) {
     ++num_nonlocals_src;
@@ -1276,6 +1282,10 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals), false))
                    + (num_locals && num_nonlocals);
 
+  // account for ptr <-> int implicit conversions through memory
+  if (does_int_mem_access)
+    glb_alloc_aligned_size = max_alloc_size = max_access_size = UINT64_MAX;
+
   // reserve a multiple of 4 for the number of offset bits to make SMT &
   // counterexamples more readable
   // Allow an extra bit for the sign
@@ -1285,10 +1295,6 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_offset = min(round_up(max_geps, 4), (uint64_t)t.src.bitsPtrOffset());
   bits_for_offset = min(bits_for_offset, config::max_offset_bits);
   bits_for_offset = min(bits_for_offset, bits_program_pointer);
-
-  // we may have an implicit ptr2int through memory. Ensure we have enough bits
-  if (has_ptr_load && does_int_mem_access && t.tgt.has(FnAttrs::Asm))
-    bits_for_offset = bits_program_pointer;
 
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.
@@ -1310,9 +1316,6 @@ static void calculateAndInitConstants(Transform &t) {
   bits_ptr_address = min(max(max(bits_for_offset, bits_size_t),
                              bits_ptr_address) + has_local_bit,
                          bits_program_pointer);
-
-  if (t.tgt.has(FnAttrs::Asm))
-    bits_ptr_address = bits_program_pointer;
 
   // TODO: this is only needed if some program pointer is observable
   bits_for_offset = max(bits_ptr_address, bits_for_offset);
