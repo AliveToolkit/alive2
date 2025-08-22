@@ -2250,6 +2250,25 @@ void Memory::startLifetime(const StateValue &ptr) {
            ptr.non_poison);
 }
 
+void Memory::constrainFreezePointer(const Pointer &ptr) {
+  auto bid = ptr.getShortBid();
+  auto islocal = ptr.isLocal();
+
+  if (next_local_bid > 0) {
+    expr local_limit = expr::mkUInt(next_local_bid - 1, bid);
+    state->addPre(islocal.implies(bid.ule(local_limit)));
+  }
+
+  if(next_nonlocal_bid <= max_program_nonlocal_bid()) {
+    if (num_nonlocals_src >= 0) {
+      expr nonlocal_limit = expr::mkUInt(num_nonlocals_src, bid);
+      if (!islocal.isTrue()) {
+        state->addPre(islocal && bid.ule(nonlocal_limit));
+      }
+    }
+  }
+}
+
 void Memory::free(const StateValue &ptr, bool unconstrained) {
   assert(!memory_unused() || ptr.non_poison.isFalse());
   Pointer p(*this, ptr.value);

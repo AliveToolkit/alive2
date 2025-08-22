@@ -671,14 +671,11 @@ StateValue State::freeze(const Type &ty, const StateValue &v) {
   expr nondet = expr::mkFreshVar("nondet", v.value);
   addQuantVar(nondet);
 
-  // limit the output of freeze when the input is undef/poison
-  if (ty.isPtrType() && !isSource()) {
+  if (ty.isPtrType()) {
     Pointer p(memory, nondet);
-    auto bid = p.getShortBid();
-    expr limit = expr::mkUInt(num_nonlocals_src, bid);
-    // Constrain non-local pointers to source-visible range
-    addAxiom((!p.isLocal()).implies(bid.ult(limit)));
+    memory.constrainFreezePointer(p);
   }
+
   return { expr::mkIf(v.non_poison, v.value, nondet), true };
 }
 
