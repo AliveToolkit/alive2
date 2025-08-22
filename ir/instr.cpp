@@ -4022,6 +4022,7 @@ StateValue GEP::toSMT(State &s) const {
     if (inbounds) {
       // FIXME: not implemented for physical pointers
       s.addUB(ptr.isLogical());
+      s.doesApproximation("gep inbounds of phy ptr", !ptr.isLogical(), true);
       inbounds_np.add(ptr.inbounds(false));
     }
 

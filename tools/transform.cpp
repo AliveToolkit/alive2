@@ -148,8 +148,10 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
     set<string> approx;
     for (auto *v : { &src_state.getApproximations(),
                      &tgt_state.getApproximations() }) {
-      for (auto &[msg, var] : *v) {
-        if (!var || m.hasFnModel(*var) || var->isConst())
+      for (auto &[msg, var, only_true] : *v) {
+        if (!var ||
+            (only_true && m.eval(*var).isTrue()) ||
+            (!only_true && (var->isConst() || m.hasFnModel(*var))))
           approx.emplace(msg);
       }
     }

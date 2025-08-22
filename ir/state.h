@@ -160,7 +160,8 @@ private:
   // for -disallow-ub-exploitation
   smt::OrExpr unreachable_paths;
 
-  std::set<std::pair<std::string,std::optional<smt::expr>>> used_approximations;
+  std::set<std::tuple<std::string, std::optional<smt::expr>, bool>>
+    used_approximations;
 
   std::set<smt::expr> quantified_vars;
   std::set<smt::expr> nondet_vars;
@@ -317,7 +318,8 @@ public:
 
   auto& getVarArgsData() { return var_args_data.data; }
 
-  void doesApproximation(std::string &&name, std::optional<smt::expr> e = {});
+  void doesApproximation(std::string &&name, std::optional<smt::expr> e = {},
+                         bool must_be_true = false);
   auto& getApproximations() const { return used_approximations; }
 
   smt::expr getFreshNondetVar(const char *prefix, const smt::expr &type);

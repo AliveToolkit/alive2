@@ -2563,7 +2563,8 @@ expr Memory::ptr2int(const expr &ptr, bool escapes) {
   assert(!memory_unused() && observesAddresses());
   Pointer p(*this, ptr);
   observesAddr(p, escapes);
-  state->addUB(!p.isNocapture());
+  if (escapes)
+    state->addUB(!p.isNocapture());
   return p.getAddress();
 }
 
