@@ -1953,7 +1953,7 @@ StateValue FpConversionOp::toSMT(State &s) const {
         np = std::move(no_overflow);
       } else {
         np = true;
-        bv = expr::mkIf(no_overflow, bv, s.getFreshNondetVar("nondet", bv));
+        bv = mkIf_fold(no_overflow, bv, s.getFreshNondetVar("nondet", bv));
       }
 
       if (op == FPToSInt_Sat)
