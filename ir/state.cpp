@@ -396,12 +396,6 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
     }
   }
 
-  // some sort of undef concatenated with something else
-  if (repls.empty() && missing_tests.empty()) {
-    addUB(expr(false));
-    return expr::mkNumber("0", e);
-  }
-
   if (missing_tests.empty())
     return e.subst_simplify(repls);
 
