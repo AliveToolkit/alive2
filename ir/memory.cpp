@@ -2996,8 +2996,13 @@ void Memory::print(ostream &os, const Model &m) const {
       P("align", expr::mkInt(1, 64) << p.blockAlignment().zextOrTrunc(64));
       P("alloc type", p.getAllocType());
       P("alive", p.isBlockAlive());
-      if (observesAddresses())
-        P("address", p.getAddress());
+      if (observesAddresses()) {
+        auto v = m.eval(p.getAddress(), false);
+        if (v.isConst()) {
+          os << "\taddress: ";
+          v.printHexadecimal(os);
+        }
+      }
       if (!local && is_constglb(bid))
         os << "\tconst";
       os << '\n';
