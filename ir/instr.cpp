@@ -3701,27 +3701,34 @@ StateValue AssumeVal::toSMT(State &s) const {
     break;
   }
 
+  auto scalar = [&](const Type &ty, const StateValue &v) -> StateValue {
+    expr np = fn(v.value);
+
+    if (config::disallow_ub_exploitation)
+      s.addGuardableUB(expr(np));
+
+    if (is_welldefined) {
+      s.addUB(std::move(np));
+      np = true;
+    }
+
+    StateValue res(expr(v.value), v.non_poison && np);
+    // there's no poison in assembly
+    if (s.isAsmMode()) {
+      res = s.freeze(ty, res);
+    }
+    return res;
+  };
+
   auto &v = s.getMaybeUB(*val, is_welldefined);
   if (auto agg = getType().getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      auto elem = agg->extract(v, i);
-      vals.emplace_back(expr(elem.value), elem.non_poison && fn(elem.value));
+      vals.emplace_back(scalar(agg->getChild(i), agg->extract(v, i)));
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
   }
-
-  expr np = fn(v.value);
-
-  if (config::disallow_ub_exploitation)
-    s.addGuardableUB(expr(np));
-
-  if (is_welldefined) {
-    s.addUB(std::move(np));
-    np = true;
-  }
-
-  return { expr(v.value), v.non_poison && np };
+  return scalar(getType(), v);
 }
 
 expr AssumeVal::getTypeConstraints(const Function &f) const {
