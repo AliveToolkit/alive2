@@ -384,6 +384,8 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
   vector<pair<expr,expr>> repls;
   set<expr> missing_tests;
   expr conds = true;
+  bool has_undef = false;
+
   for (auto &var : vars) {
     if (var.fn_name().starts_with("isundef_")) {
       expr test = var == 0;
@@ -393,10 +395,12 @@ expr State::strip_undef_and_add_ub(const Value &val, const expr &e,
       } else {
         missing_tests.emplace(var);
       }
+    } else {
+      has_undef = has_undef || isUndef(var);
     }
   }
 
-  if (missing_tests.empty())
+  if (missing_tests.empty() && !has_undef)
     return e.subst_simplify(repls);
 
   expr e2;

@@ -193,10 +193,12 @@ expr Pointer::isLogical() const {
 }
 
 expr Pointer::isLocal(bool simplify) const {
-  if (m.numLocals() == 0)
-    return false;
-  if (m.numNonlocals() == 0 && !simplify)
-    return true;
+  if (simplify || !hasLocalBit()) {
+    if (m.numLocals() == 0)
+      return false;
+    if (m.numNonlocals() == 0)
+      return true;
+  }
 
   auto bit = bits_for_bid - 1 + bits_for_offset + bits_for_ptrattrs;
   expr local = p.extract(bit, bit);
@@ -801,7 +803,7 @@ expr Pointer::refined(const Pointer &other) const {
   auto [p2l, d2] = other.toLogicalLocal();
 
   // This refers to a block that was malloc'ed within the function
-  expr local = d2 && p2l.isLocal();
+  expr local = d2 && p2l.isLocal(false);
   local &= p1l.getAllocType() == p2l.getAllocType();
   if (is_asm) {
     local &= at_least_same_offseting(p1l, p2l, true);
@@ -819,7 +821,7 @@ expr Pointer::refined(const Pointer &other) const {
   //local &= block_refined(other);
 
   expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
-  expr is_local = d1 && p1l.isLocal();
+  expr is_local = d1 && p1l.isLocal(false);
 
   // short-circuit to avoid the constraint below:
   // addr == 0 ? addr' == 0 : addr == addr'
