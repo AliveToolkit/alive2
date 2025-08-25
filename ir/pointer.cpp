@@ -195,7 +195,7 @@ expr Pointer::isLogical() const {
 expr Pointer::isLocal(bool simplify) const {
   if (m.numLocals() == 0)
     return false;
-  if (m.numNonlocals() == 0)
+  if (m.numNonlocals() == 0 && !simplify)
     return true;
 
   auto bit = bits_for_bid - 1 + bits_for_offset + bits_for_ptrattrs;

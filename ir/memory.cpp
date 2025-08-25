@@ -2250,6 +2250,12 @@ void Memory::startLifetime(const StateValue &ptr) {
            ptr.non_poison);
 }
 
+void Memory::constrainFreezePointer(const Pointer &ptr) {
+  auto bid = ptr.getShortBid();
+  state->addPre(ptr.isLocal(false) ||
+                bid.ule(expr::mkUInt(num_nonlocals-1, bid)));
+}
+
 void Memory::free(const StateValue &ptr, bool unconstrained) {
   assert(!memory_unused() || ptr.non_poison.isFalse());
   Pointer p(*this, ptr.value);

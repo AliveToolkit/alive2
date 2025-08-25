@@ -321,6 +321,9 @@ public:
   // Start lifetime of a local block.
   void startLifetime(const StateValue &ptr);
 
+  // Constrain freeze pointer to currently used blocks for POR optimization
+  void constrainFreezePointer(const Pointer &ptr);
+
   // If unconstrained is true, the pointer offset, liveness, and block kind
   // are not checked.
   void free(const StateValue &ptr, bool unconstrained);

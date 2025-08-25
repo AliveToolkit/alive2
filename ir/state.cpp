@@ -664,6 +664,10 @@ StateValue State::freeze(const Type &ty, const StateValue &v) {
 
   expr nondet = expr::mkFreshVar("nondet", v.value);
   addQuantVar(nondet);
+
+  if (ty.isPtrType())
+    memory.constrainFreezePointer({ memory, nondet });
+
   return { expr::mkIf(v.non_poison, v.value, nondet), true };
 }
 
