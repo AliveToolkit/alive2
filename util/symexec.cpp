@@ -31,7 +31,7 @@ void sym_exec_init(State &s) {
 
   // global constants need to be created in the right order so they get the
   // first bids in source, and the last in target
-  set<const Value*> seen_inits;
+  unordered_set<const Value*> seen_inits;
   for (const auto &v : f.getConstants()) {
     if (auto gv = dynamic_cast<const GlobalVariable*>(&v)) {
       if (gv->isConst() == s.isSource()) {
@@ -42,12 +42,27 @@ void sym_exec_init(State &s) {
   }
 
   // add constants & inputs to State table first of all
-  for (auto &l : { f.getConstants(), f.getInputs(), f.getUndefs() }) {
-    for (const auto &v : l) {
+  auto add = [&](const auto &vals) {
+    for (const auto &v : vals) {
       if (!seen_inits.count(&v))
         s.exec(v);
     }
+  };
+  add(f.getConstants());
+
+  // First run through the byval inputs, so they get their global bids first
+  // This is needed because the remaining inputs need to add preconditions
+  // that they don't alias the byval inputs.
+  for (const auto &in : f.getInputs()) {
+    if (dynamic_cast<const Input&>(in).hasAttribute(ParamAttrs::ByVal))
+      s.exec(in);
   }
+  for (const auto &in : f.getInputs()) {
+    if (!dynamic_cast<const Input&>(in).hasAttribute(ParamAttrs::ByVal))
+      s.exec(in);
+  }
+
+  add(f.getUndefs());
 
   if (f.getFirstBB().getName() == "#init") {
     s.startBB(f.getFirstBB());
