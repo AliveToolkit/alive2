@@ -433,6 +433,14 @@ void Solver::block(const Model &m, Solver *sneg) {
     assignments.insert(var == val);
   }
 
+  // FIXME: this doesn't handle the else case
+  // It would need an extra qualifier
+  for (const auto &[fn_name, model] : m.getFns()) {
+    for (const auto &[fn, val] : model) {
+      assignments.insert(fn == val);
+    }
+  }
+
   if (sneg) {
     // simple left-to-right variable discard algorithm
     for (auto I = assignments.begin(); I != assignments.end(); ) {

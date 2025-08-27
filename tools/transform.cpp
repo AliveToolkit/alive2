@@ -233,17 +233,29 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
       reduce(var);
     }
   }
-  for (const auto &[var, value] : r.getModel()) {
-    if (!var.fn_name().starts_with("isundef_")) {
-      reduce(var);
-    }
+
+  // check if the model is unique
+  bool unique_model = false;
+  {
+    SolverPush push(solver);
+    solver.block((newr ? &*newr : &r)->getModel());
+    auto tmpr = solver.check("check-uniqueness");
+    unique_model = tmpr.isUnsat();
   }
 
-  // reduce functions. They are a map inputs -> output + else clause
-  // We ignore the else clause as it's not easy to do something with it.
-  for (const auto &[fn, interp] : r.getModel().getFns()) {
-    for (const auto &[var, value] : interp) {
-      reduce(var);
+  if (!unique_model) {
+    for (const auto &[var, value] : r.getModel()) {
+      if (!var.fn_name().starts_with("isundef_")) {
+        reduce(var);
+      }
+    }
+
+    // reduce functions. They are a map inputs -> output + else clause
+    // We ignore the else clause as it's not easy to do something with it.
+    for (const auto &[fn, interp] : r.getModel().getFns()) {
+      for (const auto &[var, value] : interp) {
+        reduce(var);
+      }
     }
   }
 
@@ -254,6 +266,10 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
   s << msg;
   if (!var_name.empty())
     s << " for " << *var;
+
+  if (unique_model)
+    s << "\n\nNOTE: The counterexample is unique.";
+
   s << "\n\nExample:\n";
 
   for (auto &var: src_state.getFn().getInputs()) {
