@@ -1713,13 +1713,14 @@ void Memory::syncWithSrc(const Memory &src) {
   // TODO: copy alias info for fn return ptrs from src?
 }
 
-void Memory::markByValAndRecordLocalBlock(unsigned bid, bool is_const) {
+void Memory::markByVal(unsigned bid, bool is_const) {
   assert(is_globalvar(bid, false));
   byval_blks.emplace_back(bid, is_const);
 
   // Record this local block to never alias non-local blocks.
-  for (auto &[bid_expr, alias] : ptr_alias)
-    state->addAxiom(bid_expr != expr::mkUInt(bid, bid_expr.bits()));
+  for (auto &[bid_expr, alias] : ptr_alias) {
+    state->addAxiom(bid_expr != bid);
+  }
 }
 
 expr Memory::mkInput(const char *name, const ParamAttrs &attrs0) {
