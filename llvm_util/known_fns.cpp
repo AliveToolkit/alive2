@@ -490,6 +490,12 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
     set_param(1, ParamAttrs::NoCapture);
     RETURN_APPROX();
 
+  case llvm::LibFunc_abort:
+    attrs.set(FnAttrs::NoFree);
+    attrs.set(FnAttrs::NoReturn);
+    attrs.set(FnAttrs::NoThrow);
+    RETURN_EXACT();
+
   default:
     RETURN_APPROX();
   }
