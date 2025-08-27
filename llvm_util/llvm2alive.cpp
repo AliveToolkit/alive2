@@ -115,6 +115,16 @@ unsigned range_idx;
   if (!ty || !a || !b || !c)              \
     return error(i)
 
+#define PARSE_QUADOP()                    \
+  auto ty = llvm_type2alive(i.getType()); \
+  auto a = get_operand(i.getOperand(0));  \
+  auto b = get_operand(i.getOperand(1));  \
+  auto c = get_operand(i.getOperand(2));  \
+  auto d = get_operand(i.getOperand(3));  \
+  if (!ty || !a || !b || !c || !d)        \
+    return error(i)
+
+
 class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   BasicBlock *BB;
   Function *alive_fn;
@@ -1217,6 +1227,26 @@ public:
           UNREACHABLE();
         }
         return make_unique<X86IntrinTerOp>(*ty, value_name(i), *a, *b, *c, op);
+      }
+
+#define PROCESS(NAME) case llvm::Intrinsic::NAME:
+#include "ir/x86_intrinsics_quadop.inc"
+#undef PROCESS
+      {
+        PARSE_QUADOP();
+        X86IntrinQuadOp::Op op;
+        switch (i.getIntrinsicID()) {
+#define PROCESS(NAME)                                                          \
+  case llvm::Intrinsic::NAME:                                                  \
+    op = X86IntrinQuadOp::NAME;                                                \
+    break;
+#include "ir/x86_intrinsics_quadop.inc"
+#undef PROCESS
+        default:
+          UNREACHABLE();
+        }
+        return
+          make_unique<X86IntrinQuadOp>(*ty, value_name(i), *a, *b, *c, *d, op);
       }
 
     default:

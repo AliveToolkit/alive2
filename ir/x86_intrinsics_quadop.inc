@@ -1,0 +1,6 @@
+PROCESS(x86_avx512_pternlog_d_128)
+PROCESS(x86_avx512_pternlog_d_256)
+PROCESS(x86_avx512_pternlog_d_512)
+PROCESS(x86_avx512_pternlog_q_128)
+PROCESS(x86_avx512_pternlog_q_256)
+PROCESS(x86_avx512_pternlog_q_512)

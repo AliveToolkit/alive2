@@ -586,6 +586,7 @@ unique_ptr<Instr> X86IntrinBinOp::dup(Function &f, const string &suffix) const {
   return make_unique<X86IntrinBinOp>(getType(), getName() + suffix, *a, *b, op);
 }
 
+
 // the shape of a vector is stored as <# of lanes, element bits>
 static constexpr std::pair<uint8_t, uint8_t> terop_shape_op0[] = {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H) std::make_pair(C, D),
@@ -702,4 +703,93 @@ void X86IntrinTerOp::rauw(const Value &what, Value &with) {
   RAUW(b);
   RAUW(c);
 }
-} // namespace IR
+
+
+void X86IntrinQuadOp::print(ostream &os) const {
+  const char *name = nullptr;
+  switch (op) {
+#define PROCESS(NAME)                                                          \
+  case NAME:                                                                   \
+    name = #NAME;                                                              \
+    break;
+#include "x86_intrinsics_quadop.inc"
+#undef PROCESS
+  }
+  os << getName() << " = " << name << ' ' << *a << ", " << *b << ", " << *c
+     << ", " << *d;
+}
+
+StateValue X86IntrinQuadOp::toSMT(State &s) const {
+  auto ty = getType().getAsAggregateType();
+  auto &av = s[*a];
+  auto &bv = s[*b];
+  auto &cv = s[*c];
+  auto &dv = s[*d];
+
+  auto lut_word = [](const expr &a, const expr &b, const expr &c,
+                     const expr &d) -> expr {
+    expr res;
+    for (unsigned i = 0, e = a.bits(); i < e; ++i) {
+      auto bits
+        = a.extract(i, i).concat(b.extract(i, i)).concat(c.extract(i, i));
+      auto bit = d.lshr(bits.zext(32-3)).extract(0, 0);
+      res = i == 0 ? std::move(bit) : bit.concat(res);
+    }
+    return res;
+  };
+
+  switch (op) {
+  case x86_avx512_pternlog_d_128:
+  case x86_avx512_pternlog_d_256:
+  case x86_avx512_pternlog_d_512:
+  case x86_avx512_pternlog_q_128:
+  case x86_avx512_pternlog_q_256:
+  case x86_avx512_pternlog_q_512: {
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = ty->numElementsConst(); i < e; ++i) {
+      auto [a, ap] = ty->extract(av, i);
+      auto [b, bp] = ty->extract(bv, i);
+      auto [c, cp] = ty->extract(cv, i);
+      vals.emplace_back(lut_word(a, b, c, dv.value),
+                        ap && bp && cp && dv.non_poison);
+    }
+    return ty->aggregateVals(vals);
+  }
+  }
+  UNREACHABLE();
+}
+
+expr X86IntrinQuadOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType() == a->getType() &&
+         getType() == b->getType() &&
+         getType() == c->getType() &&
+         d->getType().enforceIntType(32);
+}
+
+unique_ptr<Instr>
+X86IntrinQuadOp::dup(Function &f, const string &suffix) const {
+  return make_unique<X86IntrinQuadOp>(getType(), getName() + suffix, *a, *b, *c,
+                                      *d, op);
+}
+
+vector<Value *> X86IntrinQuadOp::operands() const {
+  return {a, b, c, d};
+}
+
+bool X86IntrinQuadOp::propagatesPoison() const {
+  return true;
+}
+
+bool X86IntrinQuadOp::hasSideEffects() const {
+  return false;
+}
+
+void X86IntrinQuadOp::rauw(const Value &what, Value &with) {
+  RAUW(a);
+  RAUW(b);
+  RAUW(c);
+  RAUW(d);
+}
+
+}
