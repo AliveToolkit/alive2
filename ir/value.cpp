@@ -234,8 +234,7 @@ StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
           .release();
     bool is_const = hasAttribute(ParamAttrs::NoWrite) ||
                     !s.getFn().getFnAttrs().mem.canWrite(MemoryAccess::Args);
-    // This byval ptr can never alias non-local memory blocks.
-    s.getMemory().markByValAndRecordLocalBlock(bid, is_const);
+    s.getMemory().markByVal(bid, is_const);
   } else {
     auto name = getSMTName(child);
     val = ty.mkInput(s, name.c_str(), attrs);
