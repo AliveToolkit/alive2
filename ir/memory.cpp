@@ -1839,8 +1839,14 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
   alias.setMayAliasUpTo(false, max_nonlocal_bid);
 
   for (auto [byval_bid, is_const] : byval_blks) {
-    nonlocal &= bid != byval_bid;
-    alias.setNoAlias(false, byval_bid);
+    expr equals_input = false;
+    for (auto &in : ptr_inputs) {
+      equals_input |= in.val.non_poison &&
+                      Pointer(*this, in.val.value).getBid() == byval_bid;
+    }
+    nonlocal &= equals_input || bid != byval_bid;
+    if (equals_input.isFalse())
+      alias.setNoAlias(false, byval_bid);
   }
   ptr_alias.emplace(p.getBid(), std::move(alias));
 
