@@ -283,7 +283,7 @@ public:
   static void resetGlobals();
   void syncWithSrc(const Memory &src);
 
-  void markByValAndRecordLocalBlock(unsigned bid, bool is_const);
+  void markByVal(unsigned bid, bool is_const);
   smt::expr mkInput(const char *name, const ParamAttrs &attrs);
   std::pair<smt::expr, smt::expr> mkUndefInput(const ParamAttrs &attrs);
 
