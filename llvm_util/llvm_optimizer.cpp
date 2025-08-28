@@ -2,21 +2,45 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_optimizer.h"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
 
 using namespace llvm;
 using namespace std;
 
+static void init_llvm_targets() {
+  static bool initialized = false;
+  static codegen::RegisterCodeGenFlags CFG;
+  if (initialized)
+    return;
+
+  initialized = true;
+  InitializeAllTargets();
+  InitializeAllTargetMCs();
+}
+
 namespace llvm_util {
 
-string optimize_module(llvm::Module *M, string_view optArgs) {
-  llvm::LoopAnalysisManager LAM;
-  llvm::FunctionAnalysisManager FAM;
-  llvm::CGSCCAnalysisManager CGAM;
-  llvm::ModuleAnalysisManager MAM;
-  llvm::PassBuilder PB;
+string optimize_module(llvm::Module &M, string_view optArgs) {
+  init_llvm_targets();
 
-  llvm::ModulePassManager MPM;
+  Triple ModuleTriple(M.getTargetTriple());
+  unique_ptr<llvm::TargetMachine> TM;
+  if (ModuleTriple.getArch()) {
+    auto ETM = codegen::createTargetMachineForTriple(ModuleTriple.str());
+    if (auto E = ETM.takeError())
+      return toString(std::move(E));
+    TM = std::move(*ETM);
+  }
+
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+  PassBuilder PB(TM.get());
+  ModulePassManager MPM;
 
   PB.registerModuleAnalyses(MAM);
   PB.registerCGSCCAnalyses(CGAM);
@@ -40,7 +64,7 @@ string optimize_module(llvm::Module *M, string_view optArgs) {
     if (auto Err = PB.parsePassPipeline(MPM, optArgs))
       return toString(std::move(Err));
   }
-  MPM.run(*M, MAM);
+  MPM.run(M, MAM);
   return {};
 }
 

@@ -198,8 +198,6 @@ if (BUILD_LLVM_UTILS OR BUILD_TV)
   add_library(llvm_util STATIC ${LLVM_UTIL_SRCS})
   set(ALIVE_LIBS_LLVM llvm_util ${ALIVE_LIBS})
 
-  set(LLVM_LINK_COMPONENTS ${LLVM_LINK_COMPONENTS} TargetParser)
-
   add_llvm_executable(alive-tv
     "tools/alive-tv.cpp"
   )
@@ -257,7 +255,7 @@ install(TARGETS alive alive-jobserver)
 #add_library(alive2 SHARED ${IR_SRCS} ${SMT_SRCS} ${TOOLS_SRCS} ${UTIL_SRCS} ${LLVM_UTIL_SRCS})
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
-  llvm_map_components_to_libnames(llvm_libs support core irreader bitwriter analysis passes transformutils)
+  llvm_map_components_to_libnames(llvm_libs support core irreader bitwriter analysis passes transformutils codegen AllTargetsCodeGens AllTargetsDescs AllTargetsInfos)
 #  target_link_libraries(alive2 PRIVATE ${llvm_libs})
   target_link_libraries(alive-tv PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})
   target_link_libraries(quick-fuzz PRIVATE ${ALIVE_LIBS_LLVM} ${Z3_LIBRARIES} ${HIREDIS_LIBRARIES} ${llvm_libs})

@@ -182,7 +182,7 @@ and "tgt5" will unused.
     }
     if (Cnt == 0) {
       M2 = CloneModule(*M1);
-      auto err = optimize_module(M2.get(), optPass);
+      auto err = optimize_module(*M2.get(), optPass);
       if (!err.empty()) {
         *out << "Error parsing list of LLVM passes: " << err << '\n';
         return -1;
