@@ -52,6 +52,10 @@ if (compiling()) {
         $print_cmd = 1;
     }
 
+    if (my $pass = getenv("ALIVECC_CHECK_PASS")) {
+        push @ARGV, ("-mllvm", "-tv-check-pass=".$pass);
+    }
+
     if (getenv("ALIVECC_QUIET")) {
         push @ARGV, ("-mllvm", "-tv-quiet");
     }

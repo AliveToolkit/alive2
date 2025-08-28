@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 #ifdef _MSC_VER
@@ -69,5 +70,8 @@ uint64_t mul_saturate(uint64_t a, uint64_t b);
 
 uint64_t divide_up(uint64_t n, uint64_t amount); // division with ceiling
 uint64_t round_up(uint64_t n, uint64_t amount);
+
+bool stricontains(const std::string_view &needle,
+                  const std::string_view &haystack);
 
 }

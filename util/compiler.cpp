@@ -4,6 +4,7 @@
 #include "util/compiler.h"
 #include <algorithm>
 #include <bit>
+#include <cctype>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -77,6 +78,13 @@ uint64_t divide_up(uint64_t n, uint64_t amount) {
 
 uint64_t round_up(uint64_t n, uint64_t amount) {
   return divide_up(n, amount) * amount;
+}
+
+bool stricontains(const string_view &needle, const string_view &haystack) {
+    return search(
+      needle.begin(), needle.end(),haystack.begin(), haystack.end(),
+      [](char ch1, char ch2) { return tolower(ch1) == tolower(ch2); }
+    ) != needle.end();
 }
 
 }

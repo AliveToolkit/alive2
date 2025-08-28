@@ -63,6 +63,10 @@ llvm::cl::opt<bool> batch_opts("tv-batch-opts",
   llvm::cl::desc("Batch optimizations (clang plugin only)"),
   llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<string> check_only_pass("tv-check-pass",
+  llvm::cl::desc("Check only the specified LLVM optimization pass"),
+  llvm::cl::cat(alive_cmdargs));
+
 
 struct FnInfo {
   Function fn;
@@ -623,6 +627,8 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
       bool unsupported = is_unsupported_pass(pass_name);
       bool nop = is_nop_pass(pass_name);
       bool terminate = is_terminate_pass(pass_name);
+      bool check_skip = !check_only_pass.empty() &&
+                        !stricontains(pass_name, check_only_pass);
 
       static unsigned count = 0;
 
@@ -635,6 +641,8 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
           *out << " : Global pass. Cannot continue verification\n";
         else if (nop)
           *out << " : Skipping NOP\n";
+        else if (check_skip)
+          *out << " : Skip this pass per user request\n";
         else
           *out << '\n';
       }
@@ -643,7 +651,7 @@ struct TVPass : public llvm::PassInfoMixin<TVPass> {
         return;
 
       TVLegacyPass tv;
-      tv.unsupported_transform = unsupported;
+      tv.unsupported_transform = unsupported || check_skip;
       tv.nop_transform = nop;
 
       tv.TLI_override = &get_TLI;
