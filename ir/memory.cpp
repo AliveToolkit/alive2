@@ -2167,9 +2167,6 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
   expr nooverflow = true;
   if (size) {
     size_zext  = size->zextOrTrunc(bits_size_t);
-    // we round up the size statically instead of creating a large expr later
-    if (!has_globals_diff_align)
-      size_zext = size_zext.round_up(expr::mkUInt(align, bits_size_t));
     nooverflow = size->bits() <= bits_size_t ? true :
                    size->extract(size->bits()-1, bits_size_t) == 0;
   }

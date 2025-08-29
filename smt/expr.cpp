@@ -1152,6 +1152,7 @@ expr expr::round_up(const expr &power_of_two) const {
 }
 
 expr expr::round_up_bits(const expr &nbits) const {
+  C();
   return round_up(mkUInt(1, *this) << nbits.zextOrTrunc(bits()));
 }
 

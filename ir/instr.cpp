@@ -1415,12 +1415,13 @@ void TernaryOp::rauw(const Value &what, Value &with) {
 void TernaryOp::print(ostream &os) const {
   const char *str = nullptr;
   switch (op) {
-  case FShl: str = "fshl "; break;
-  case FShr: str = "fshr "; break;
-  case SMulFix: str = "smul_fix "; break;
-  case UMulFix: str = "umul_fix "; break;
+  case FShl:       str = "fshl "; break;
+  case FShr:       str = "fshr "; break;
+  case SMulFix:    str = "smul_fix "; break;
+  case UMulFix:    str = "umul_fix "; break;
   case SMulFixSat: str = "smul_fix_sat "; break;
   case UMulFixSat: str = "umul_fix_sat "; break;
+  case ObjectSize: str = "objectsize "; break;
   }
 
   os << getName() << " = " << str << *a << ", " << *b << ", " << *c;
@@ -1432,34 +1433,41 @@ StateValue TernaryOp::toSMT(State &s) const {
   auto &cv = s[*c];
 
   auto scalar = [&](const auto &a, const auto &b, const auto &c) -> StateValue {
-  expr e, np;
-  switch (op) {
-  case FShl:
-    e = expr::fshl(a.value, b.value, c.value);
-    np = true;
-    break;
-  case FShr:
-    e = expr::fshr(a.value, b.value, c.value);
-    np = true;
-    break;
-  case SMulFix:
-    e = expr::smul_fix(a.value, b.value, c.value);
-    np = expr::smul_fix_no_soverflow(a.value, b.value, c.value);
-    break;
-  case UMulFix:
-    e = expr::umul_fix(a.value, b.value, c.value);
-    np = expr::umul_fix_no_uoverflow(a.value, b.value, c.value);
-    break;
-  case SMulFixSat:
-    e = expr::smul_fix_sat(a.value, b.value, c.value);
-    np = true;
-    break;
-  case UMulFixSat:
-    e = expr::umul_fix_sat(a.value, b.value, c.value);
-    np = true;
-    break;
-  }
-  return { std::move(e), np && a.non_poison && b.non_poison && c.non_poison };
+    StateValue v(expr(), a.non_poison && b.non_poison && c.non_poison);
+    switch (op) {
+    case FShl:
+      v.value = expr::fshl(a.value, b.value, c.value);
+      break;
+    case FShr:
+      v.value = expr::fshr(a.value, b.value, c.value);
+      break;
+    case SMulFix:
+      v.value       = expr::smul_fix(a.value, b.value, c.value);
+      v.non_poison &= expr::smul_fix_no_soverflow(a.value, b.value, c.value);
+      break;
+    case UMulFix:
+      v.value       = expr::umul_fix(a.value, b.value, c.value);
+      v.non_poison &= expr::umul_fix_no_uoverflow(a.value, b.value, c.value);
+      break;
+    case SMulFixSat:
+      v.value = expr::smul_fix_sat(a.value, b.value, c.value);
+      break;
+    case UMulFixSat:
+      v.value = expr::umul_fix_sat(a.value, b.value, c.value);
+      break;
+    case ObjectSize: {
+      expr is_unknown = s.getFreshNondetVar("objectsize_unknown", expr(false));
+      Pointer ptr(s.getMemory(), a.value);
+      expr ty = getType().getDummyValue(false).value;
+      expr unknown = expr::mkIf(b.value == 1, expr::mkUInt(0, ty),
+                                expr::mkInt(-1, ty));
+      v.value = expr::mkIf(is_unknown || (ptr.isNull() && c.value == 1),
+                           unknown,
+                           ptr.leftoverSize().zextOrTrunc(ty.bits()));
+      break;
+    }
+    }
+    return v;
   };
 
   if (getType().isVectorType()) {
@@ -1499,6 +1507,13 @@ expr TernaryOp::getTypeConstraints(const Function &f) const {
       getType() == b->getType() &&
       c->getType().enforceIntType(32) &&
       getType().enforceIntOrVectorType();
+    break;
+  case ObjectSize:
+    instrconstr =
+      getType().enforceIntType() &&
+      a->getType().enforcePtrType() &&
+      b->getType().enforceIntType(1) &&
+      c->getType().enforceIntType(1);
     break;
   }
   return Value::getTypeConstraints() && instrconstr;

@@ -226,7 +226,8 @@ public:
 
 class TernaryOp final : public Instr {
 public:
-  enum Op { FShl, FShr, SMulFix, UMulFix, SMulFixSat, UMulFixSat };
+  enum Op { FShl, FShr, SMulFix, UMulFix, SMulFixSat, UMulFixSat,
+            ObjectSize };
 
 private:
   Value *a, *b, *c;

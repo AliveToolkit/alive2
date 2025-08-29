@@ -914,16 +914,18 @@ public:
     case llvm::Intrinsic::umul_fix:
     case llvm::Intrinsic::smul_fix_sat:
     case llvm::Intrinsic::umul_fix_sat:
+    case llvm::Intrinsic::objectsize:
     {
       PARSE_TRIOP();
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
-      case llvm::Intrinsic::fshl: op = TernaryOp::FShl; break;
-      case llvm::Intrinsic::fshr: op = TernaryOp::FShr; break;
-      case llvm::Intrinsic::smul_fix: op = TernaryOp::SMulFix; break;
-      case llvm::Intrinsic::umul_fix: op = TernaryOp::UMulFix; break;
+      case llvm::Intrinsic::fshl:         op = TernaryOp::FShl; break;
+      case llvm::Intrinsic::fshr:         op = TernaryOp::FShr; break;
+      case llvm::Intrinsic::smul_fix:     op = TernaryOp::SMulFix; break;
+      case llvm::Intrinsic::umul_fix:     op = TernaryOp::UMulFix; break;
       case llvm::Intrinsic::smul_fix_sat: op = TernaryOp::SMulFixSat; break;
       case llvm::Intrinsic::umul_fix_sat: op = TernaryOp::UMulFixSat; break;
+      case llvm::Intrinsic::objectsize:   op = TernaryOp::ObjectSize; break;
       default: UNREACHABLE();
       }
       ret = make_unique<TernaryOp>(*ty, value_name(i), *a, *b, *c, op);

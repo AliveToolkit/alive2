@@ -92,6 +92,8 @@ public:
   smt::expr blockSizeAligned() const;
   smt::expr blockSizeAlignedOffsetT() const; // to compare with offsets
 
+  smt::expr leftoverSize() const;
+
   const smt::expr& operator()() const { return p; }
   smt::expr release() && { return std::move(p); }
   unsigned bits() const { return p.bits(); }

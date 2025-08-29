@@ -335,16 +335,18 @@ expr Pointer::blockSizeOffsetT() const {
 }
 
 expr Pointer::blockSizeAligned() const {
-  auto size = blockSize();
-  // programs can't observe whether the size was increased up to alignment
-  if (!has_globals_diff_align)
-    return size;
-  return size.round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
+  return blockSize().round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
 }
 
 expr Pointer::blockSizeAlignedOffsetT() const {
   expr sz = blockSizeAligned();
   return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
+}
+
+expr Pointer::leftoverSize() const {
+  auto off = getOffsetSizet();
+  auto sz  = blockSizeOffsetT();
+  return expr::mkIf(off.ule(sz), sz - off, expr::mkUInt(0, sz));
 }
 
 expr Pointer::reprWithoutAttrs() const {
