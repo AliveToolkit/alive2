@@ -2674,7 +2674,10 @@ Memory::refined(const Memory &other, bool fncall,
     return { true, Pointer(*this, expr()), {} };
 
   assert(!memory_unused());
-  Pointer ptr(*this, "#idx_refinement", false);
+  auto qvars = state->getQuantVars();
+  qvars.insert(state->getNondetVars().begin(),
+               state->getNondetVars().end());
+  Pointer ptr(*this, "#idx_refinement", false, qvars);
   expr ptr_bid = ptr.getBid();
   expr offset = ptr.getOffset();
   expr ret(true);
