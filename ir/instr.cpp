@@ -1461,9 +1461,14 @@ StateValue TernaryOp::toSMT(State &s) const {
       expr ty = getType().getDummyValue(false).value;
       expr unknown = expr::mkIf(b.value == 1, expr::mkUInt(0, ty),
                                 expr::mkInt(-1, ty));
-      v.value = expr::mkIf(is_unknown || (ptr.isNull() && c.value == 1),
+      if(ptr.leftoverSize().isValid()) {
+        v.value = expr::mkIf(is_unknown || (ptr.isNull() && c.value == 1),
                            unknown,
                            ptr.leftoverSize().zextOrTrunc(ty.bits()));
+      } else {
+        v.value = unknown;
+      }     
+      
       break;
     }
     }
