@@ -1456,14 +1456,13 @@ StateValue TernaryOp::toSMT(State &s) const {
       v.value = expr::umul_fix_sat(a.value, b.value, c.value);
       break;
     case ObjectSize: {
-      expr is_unknown = s.getFreshNondetVar("objectsize_unknown", expr(false));
       Pointer ptr(s.getMemory(), a.value);
       expr ty = getType().getDummyValue(false).value;
-      expr unknown = expr::mkIf(b.value == 1, expr::mkUInt(0, ty),
-                                expr::mkInt(-1, ty));
-      v.value = expr::mkIf(is_unknown || (ptr.isNull() && c.value == 1),
-                           unknown,
-                           ptr.leftoverSize().zextOrTrunc(ty.bits()));
+      expr realval = ptr.leftoverSize().zextOrTrunc(ty.bits());
+      v.value = s.getFreshNondetVar("objectsize", ty);
+      s.addPre(expr::mkIf(b.value == 0 || (ptr.isNull() && c.value == 1),
+                          v.value.uge(realval),
+                          v.value.ule(realval)));
       break;
     }
     }
