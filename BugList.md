@@ -104,6 +104,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 97. GlobalOpt breaks !callees metadata (https://llvm.org/PR121265)
 98. InstCombine: formation of fmax ignores SNaN (https://llvm.org/PR138303)
 99. InstSimplify: incorrect frexp(frexp(x)) -> frexp(x) fold (https://llvm.org/PR138819)
+100. Incorrect lowering of objectsize introduces UB (https://llvm.org/PR156435)
 
 
 ### Bugs found in Z3
