@@ -231,7 +231,8 @@ class Memory {
   void storeLambda(const Pointer &ptr, const smt::expr &offset,
                    const smt::expr &bytes,
                    const std::vector<std::pair<unsigned, smt::expr>> &data,
-                   const std::set<smt::expr> &undef, uint64_t align);
+                   const std::set<smt::expr> &undef, uint64_t align,
+                   bool full_write = false);
 
   // to implement the 'initializes' parameter attribute
   smt::expr hasStored(const Pointer &p, const smt::expr &bytes) const;
@@ -341,7 +342,8 @@ public:
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, uint64_t align,
-              const std::set<smt::expr> &undef_vars, bool deref_check = true);
+              const std::set<smt::expr> &undef_vars, bool deref_check = true,
+              bool full_write = false);
 
   void memset_pattern(const smt::expr &ptr, const smt::expr &pattern,
                       const smt::expr &bytesize, unsigned pattern_length);

@@ -3429,8 +3429,20 @@ StateValue Return::toSMT(State &s) const {
 
   s.addGuardableUB(s.getMemory().returnChecks());
 
+  // Overwrite any dead_on_return pointee block with poison upon return.
+  auto &m = s.getMemory();
+  const auto &inputs = s.getFn().getInputs();
+  StateValue poison = {expr::mkUInt(0, bits_byte), false};
+  for (auto &arg : inputs) {
+    if (!arg.getType().isPtrType())
+      continue;
+    auto &attrs = static_cast<const Input&>(arg).getAttributes();
+    if (attrs.has(ParamAttrs::DeadOnReturn))
+      m.memset(s[arg].value, poison, {}, bits_byte / 8, {}, false, true);
+  }
+
   vector<pair<Value*, ParamAttrs>> args;
-  for (auto &arg : s.getFn().getInputs()) {
+  for (auto &arg : inputs) {
     args.emplace_back(const_cast<Value*>(&arg), ParamAttrs());
   }
 

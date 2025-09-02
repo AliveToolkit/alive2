@@ -1295,7 +1295,8 @@ void Memory::store(const Pointer &ptr,
 void Memory::storeLambda(const Pointer &ptr, const expr &offset,
                          const expr &bytes,
                          const vector<pair<unsigned, expr>> &data,
-                         const set<expr> &undef, uint64_t align) {
+                         const set<expr> &undef, uint64_t align,
+                         bool full_write) {
   assert(!state->isInitializationPhase());
 
   bool val_no_offset = data.size() == 1 && !data[0].second.vars().count(offset);
@@ -1312,7 +1313,7 @@ void Memory::storeLambda(const Pointer &ptr, const expr &offset,
     auto orig_val = ::raw_load(blk.val, offset);
 
     // optimization: full rewrite
-    if (bytes.eq(ptr.blockSizeAligned())) {
+    if (full_write || bytes.eq(ptr.blockSizeAligned())) {
       blk.val = val_no_offset
         ? mk_block_if(cond, val, std::move(blk.val))
         : expr::mkLambda(offset, "#offset",
@@ -2417,7 +2418,7 @@ Byte Memory::raw_load(const Pointer &p) {
 
 void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
                     uint64_t align, const set<expr> &undef_vars,
-                    bool deref_check) {
+                    bool deref_check, bool full_write) {
   assert(!memory_unused());
   assert(!val.isValid() || val.bits() == 8);
   unsigned bytesz = bits_byte / 8;
@@ -2436,7 +2437,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
   expr raw_byte = std::move(bytes[0])();
 
   uint64_t n;
-  if (bytesize.isUInt(n) && (n / bytesz) <= 4) {
+  if (!full_write && bytesize.isUInt(n) && (n / bytesz) <= 4) {
     vector<pair<unsigned, expr>> to_store;
     for (unsigned i = 0; i < n; i += bytesz) {
       to_store.emplace_back(i, raw_byte);
@@ -2444,7 +2445,9 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
     store(ptr, to_store, undef_vars, align);
   } else {
     expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
-    storeLambda(ptr, offset, bytesize, {{0, raw_byte}}, undef_vars, align);
+    expr sz = full_write ? ptr.blockSizeAligned() : bytesize;
+    storeLambda(ptr, offset, std::move(sz), {{0, raw_byte}}, undef_vars, align,
+                full_write);
   }
 }
 
