@@ -6,4 +6,4 @@ define i1 @f(ptr %p, i64 %i, i64 %j) {
   ret i1 %c
 }
 
-; CHECK: has_ptr2int: 1
+; CHECK: observes_addresses: 1
