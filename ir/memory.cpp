@@ -936,8 +936,9 @@ expr Memory::isBlockAlive(const expr &bid, bool local) const {
       (!local && has_null_block && !null_is_dereferenceable ? bid != 0 : true);
 }
 
-bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
-                      const expr &bytes, uint64_t align, bool write) const {
+bool Memory::mayalias(const Pointer &p, bool local, unsigned bid0,
+                      const expr &offset0, const expr &bytes, uint64_t align,
+                      bool write) const {
   if (local && bid0 >= next_local_bid)
     return false;
 
@@ -952,8 +953,8 @@ bool Memory::mayalias(bool local, unsigned bid0, const expr &offset0,
 
   expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
 
-  if (auto sz = (local ? local_blk_size : non_local_blk_size).lookup(bid)) {
-    if (sz->ult(bytes).isTrue())
+  if ((local ? local_blk_size : non_local_blk_size).lookup(bid)) {
+    if (p.blockSizeAligned().ult(bytes).isTrue())
       return false;
 
     //expr offset = offset0.sextOrTrunc(bits_size_t);
@@ -1016,10 +1017,10 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
   auto sz_local    = min(next_local_bid, (unsigned)aliasing.size(true));
   auto sz_nonlocal = aliasing.size(false);
 
-  auto check_alias = [&](AliasSet &alias, bool local, unsigned bid,
-                         const expr &offset) {
+  auto check_alias = [&](const Pointer &p, AliasSet &alias, bool local,
+                         unsigned bid, const expr &offset) {
     if (!alias.mayAlias(local, bid) &&
-        mayalias(local, bid, offset, bytes, align, write))
+        mayalias(p, local, bid, offset, bytes, align, write))
       alias.setMayAlias(local, bid);
   };
 
@@ -1038,9 +1039,9 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
     if (shortbid.isUInt(bid) &&
         (!isAsmMode() || state->isImplied(p.isInbounds(true), true))) {
       if (!is_local.isFalse() && bid < sz_local)
-        check_alias(this_alias, true, bid, offset);
+        check_alias(p, this_alias, true, bid, offset);
       if (!is_local.isTrue() && bid < sz_nonlocal)
-        check_alias(this_alias, false, bid, offset);
+        check_alias(p, this_alias, false, bid, offset);
       goto end;
     }
 
@@ -1063,7 +1064,7 @@ Memory::AliasSet Memory::computeAliasing(const Pointer &ptr, const expr &bytes,
             is_from_fn_or_load &&
             !escaped_local_blks.mayAlias(true, i))
           continue;
-        check_alias(this_alias, local, i, offset);
+        check_alias(Pointer(*this, i, local), this_alias, local, i, offset);
       }
     }
     }

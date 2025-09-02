@@ -200,8 +200,9 @@ class Memory {
   smt::expr mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const;
   void mkNonlocalValAxioms(const smt::expr &block) const;
 
-  bool mayalias(bool local, unsigned bid, const smt::expr &offset,
-                const smt::expr &bytes, uint64_t align, bool write) const;
+  bool mayalias(const Pointer &p, bool local, unsigned bid,
+                const smt::expr &offset, const smt::expr &bytes, uint64_t align,
+                bool write) const;
 
   AliasSet computeAliasing(const Pointer &ptr, const smt::expr &bytes,
                            uint64_t align, bool write) const;
