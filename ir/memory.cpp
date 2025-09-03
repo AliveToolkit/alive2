@@ -2651,7 +2651,7 @@ expr Memory::blockValRefined(const Pointer &src, const Memory &tgt,
   expr ptr_offset = src.getShortOffset();
   uint64_t bytes;
   if (full_check &&
-      src.blockSize().isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
+      src.blockSizeAligned().isUInt(bytes) && (bytes / bytes_per_byte) <= 8) {
     expr val_refines = true;
     for (unsigned off = 0; off < (bytes / bytes_per_byte); ++off) {
       expr off_expr = expr::mkUInt(off, ptr_offset);
@@ -2662,7 +2662,8 @@ expr Memory::blockValRefined(const Pointer &src, const Memory &tgt,
     expr cnstr = refined(ptr_offset);
     if (!full_check)
       return cnstr;
-    return src.getOffsetSizet().ult(src.blockSizeOffsetT()).implies(cnstr);
+    return
+      src.getOffsetSizet().ult(src.blockSizeAlignedOffsetT()).implies(cnstr);
   }
 }
 
@@ -2739,7 +2740,8 @@ Memory::refined(const Memory &other, bool fncall,
         !stored_tgt.second && stored_tgt.first.empty()) {
       // block not stored; no need to verify
     }
-    else if (p.blockSize().isUInt(bytes) && (bytes / (bits_byte / 8)) <= 8) {
+    else if (p.blockSizeAligned().isUInt(bytes) &&
+             (bytes / (bits_byte / 8)) <= 8) {
       // this is a small block; just check it thoroughly
       val_refined = blockValRefined(p, other, bid, undef_vars, true);
     }
