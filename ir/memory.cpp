@@ -2445,8 +2445,7 @@ void Memory::memset(const expr &p, const StateValue &val, const expr &bytesize,
     store(ptr, to_store, undef_vars, align);
   } else {
     expr offset = expr::mkQVar(0, Pointer::bitsShortOffset());
-    expr sz = full_write ? ptr.blockSizeAligned() : bytesize;
-    storeLambda(ptr, offset, std::move(sz), {{0, raw_byte}}, undef_vars, align,
+    storeLambda(ptr, offset, bytesize, {{0, raw_byte}}, undef_vars, align,
                 full_write);
   }
 }
