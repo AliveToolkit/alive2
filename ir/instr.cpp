@@ -3432,7 +3432,7 @@ StateValue Return::toSMT(State &s) const {
   // Overwrite any dead_on_return pointee block with poison upon return.
   auto &m = s.getMemory();
   const auto &inputs = s.getFn().getInputs();
-  StateValue poison = {expr::mkUInt(0, bits_byte), false};
+  StateValue poison = {expr::mkUInt(0, 8), false};
   for (auto &arg : inputs) {
     if (!arg.getType().isPtrType())
       continue;
