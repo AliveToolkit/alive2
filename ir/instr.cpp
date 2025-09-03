@@ -2685,7 +2685,15 @@ StateValue FnCall::toSMT(State &s) const {
   if (attrs.has(AllocKind::Alloc) ||
       attrs.has(AllocKind::Realloc) ||
       attrs.has(FnAttrs::AllocSize)) {
-    auto [size, np_size] = attrs.computeAllocSize(s, args);
+    auto [comput_size, np_size] = attrs.computeAllocSize(s, args);
+    
+    expr size;
+    if(!comput_size.isValid()) {
+      size = expr::mkFreshVar("malloc_size", expr::mkUInt(0, bits_size_t));
+    } else {
+      size = std::move(comput_size);
+    }
+
     expr nonnull = attrs.isNonNull() ? expr(true)
                                      : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
