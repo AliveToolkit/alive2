@@ -1620,6 +1620,10 @@ public:
         attrs.set(ParamAttrs::DeadOnUnwind);
         break;
 
+      case llvm::Attribute::DeadOnReturn:
+        attrs.set(ParamAttrs::DeadOnReturn);
+        break;
+
       case llvm::Attribute::Initializes:
         for (auto &CR : llvmattr.getInitializes()) {
           auto l = CR.getLower().tryZExtValue();
