@@ -88,6 +88,7 @@ public:
   smt::expr getPhysicalAddress() const;
 
   smt::expr blockSize() const;
+  smt::expr blockMaxSize() const;
   smt::expr blockSizeOffsetT() const; // to compare with offsets
   smt::expr blockSizeAligned() const;
   smt::expr blockSizeAlignedOffsetT() const; // to compare with offsets
@@ -146,10 +147,13 @@ public:
     STACK,
     MALLOC,
     CXX_NEW,
+    GROWABLE,
+    NUM_ALLOC_TYPES
   };
   smt::expr getAllocType() const;
   smt::expr isStackAllocated(bool simplify = true) const;
   smt::expr isHeapAllocated() const;
+  smt::expr isGrowableAlloc() const;
   smt::expr isNocapture(bool simplify = true) const;
   smt::expr isNoRead() const;
   smt::expr isNoWrite() const;

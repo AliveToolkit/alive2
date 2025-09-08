@@ -951,13 +951,10 @@ bool Memory::mayalias(const Pointer &p, bool local, unsigned bid0,
   if (state->isUndef(offset0))
     return false;
 
-  expr bid = expr::mkUInt(bid0, Pointer::bitsShortBid());
+  if (p.blockSizeAligned().ult(bytes).isTrue())
+    return false;
 
-  if ((local ? local_blk_size : non_local_blk_size).lookup(bid)) {
-    if (p.blockSizeAligned().ult(bytes).isTrue())
-      return false;
-
-    //expr offset = offset0.sextOrTrunc(bits_size_t);
+  //expr offset = offset0.sextOrTrunc(bits_size_t);
 
 #if 0
     // Never hits in practice
@@ -973,15 +970,17 @@ bool Memory::mayalias(const Pointer &p, bool local, unsigned bid0,
     }
 #endif
 
-    if (local && !observed_addrs.mayAlias(true, bid0)) {
-      // block align must be >= access align if the address hasn't been observed
-      if (auto blk_align0 = local_blk_align.lookup(bid)) {
-        uint64_t blk_align;
-        if (blk_align0->isUInt(blk_align) &&
-            (1ull << blk_align) < align)
-          return false;
-      }
+  expr bid = p.getShortBid();
+
+  if (local && !observed_addrs.mayAlias(true, bid0)) {
+    // block align must be >= access align if the address hasn't been observed
+    if (auto blk_align0 = local_blk_align.lookup(bid)) {
+      uint64_t blk_align;
+      if (blk_align0->isUInt(blk_align) &&
+          (1ull << blk_align) < align)
+        return false;
     }
+  }
 
 #if 0
     // Never hits in practice
@@ -992,7 +991,8 @@ bool Memory::mayalias(const Pointer &p, bool local, unsigned bid0,
         return false;
     }
 #endif
-  } else if (local) // allocated in another branch
+
+  if (local && !local_blk_size.lookup(bid)) // allocated in another branch
     return false;
 
   if (isBlockAlive(bid, local).isFalse())
@@ -1528,6 +1528,9 @@ Memory::Memory(State &state)
   // TODO: should skip initialization of fully initialized constants
   for (unsigned bid = skip_null(), e = numNonlocals(); bid != e; ++bid) {
     non_local_block_val.emplace_back(mk_block_val_array(bid));
+
+    Pointer ptr(*this, bid, false);
+    non_local_blk_size.add(ptr.getShortBid(), ptr.blockSize());
   }
 
   non_local_block_liveness = mk_liveness_array();
@@ -1615,6 +1618,12 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(q.isHeapAllocated().implies(q.blockAlignment() == align));
   }
 
+  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+    Pointer p(*this, bid, false);
+    state->addAxiom(p.getAllocType().ult(Pointer::NUM_ALLOC_TYPES));
+    state->addAxiom(p.blockSize().ule(p.blockMaxSize()));
+  }
+
   if (!observesAddresses())
     return;
 
@@ -1634,7 +1643,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     // constraints for tgt.
     Pointer p1(tgt, bid, false);
     auto addr  = p1.getAddress();
-    auto sz    = p1.blockSize().zextOrTrunc(bits_ptr_address);
+    auto sz    = p1.blockMaxSize().zextOrTrunc(bits_ptr_address);
     auto align = p1.blockAlignment();
 
     // limit max alignment so that aligning block size doesn't overflow
@@ -1790,10 +1799,10 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
     assert(bid < numLocals());
 
     expr size = data ? data->size
-                     : expr::mkFreshVar((name + string("#size")).c_str(),
+                     : expr::mkFreshVar((name + "#size").c_str(),
                                         expr::mkUInt(0, bits_size_t-1)).zext(1);
     expr align = data ? data->align
-                      : expr::mkFreshVar((name + string("#align")).c_str(),
+                      : expr::mkFreshVar((name + "#align").c_str(),
                                          expr::mkUInt(0, bitsAlignmentInfo()));
 
     expr var
@@ -1816,7 +1825,7 @@ Memory::mkFnRet(const char *name0, const vector<PtrInput> &ptr_inputs,
     local_blk_align.add(short_bid, expr(align));
 
     static_assert((Pointer::MALLOC & 2) == 2 && (Pointer::CXX_NEW & 2) == 2);
-    local_blk_kind.add(short_bid, expr::mkUInt(1, 1).concat(alloc_ty));
+    local_blk_kind.add(short_bid, expr::mkUInt(1, 2).concat(alloc_ty));
 
     return { expr::mkIf(is_null, Pointer::mkNullPointer(*this)(), ptr()),
              { std::move(size), std::move(align), std::move(var) } };
@@ -1866,17 +1875,34 @@ Memory::CallState Memory::CallState::mkIf(const expr &cond,
   CallState ret;
   auto then_sz = then.non_local_block_val.size();
   auto else_sz = els.non_local_block_val.size();
-  for (unsigned i = 0, e = max(then_sz, else_sz); i != e; ++i) {
+
+  ret.non_local_block_val.resize(max(then_sz, else_sz));
+  for (size_t i = 0, e = max(then_sz, else_sz); i != e; ++i) {
     if (i >= then_sz) {
-      ret.non_local_block_val.emplace_back(els.non_local_block_val[i]);
+      ret.non_local_block_val[i] = els.non_local_block_val[i];
     } else if (i >= else_sz) {
-      ret.non_local_block_val.emplace_back(then.non_local_block_val[i]);
+      ret.non_local_block_val[i] = then.non_local_block_val[i];
     } else {
-      ret.non_local_block_val.emplace_back(
+      ret.non_local_block_val[i] =
         mk_block_if(cond, then.non_local_block_val[i],
-                    els.non_local_block_val[i]));
+                    els.non_local_block_val[i]);
     }
   }
+
+  then_sz = then.non_local_sizes.size();
+  else_sz = els.non_local_sizes.size();
+  ret.non_local_sizes.resize(max(then_sz, else_sz));
+  for (size_t i = has_null_block; i < max(then_sz, else_sz); ++i) {
+    if (i >= then_sz) {
+      ret.non_local_sizes[i] = els.non_local_sizes[i];
+    } else if (i >= else_sz) {
+      ret.non_local_sizes[i] = then.non_local_sizes[i];
+    } else {
+      ret.non_local_sizes[i] =
+        expr::mkIf(cond, then.non_local_sizes[i], els.non_local_sizes[i]);
+    }
+  }
+
   ret.writes_block = expr::mkIf(cond, then.writes_block, els.writes_block);
   ret.frees_block = expr::mkIf(cond, then.frees_block, els.frees_block);
   ret.writes_args = expr::mkIf(cond, then.writes_args, els.writes_args);
@@ -1891,7 +1917,16 @@ expr Memory::CallState::operator==(const CallState &rhs) const {
     for (unsigned i = 0, e = non_local_block_val.size(); i != e; ++i) {
       ret &= non_local_block_val[i] == rhs.non_local_block_val[i];
     }
+  } else {
+    return false;
   }
+
+  assert(non_local_sizes.size() == rhs.non_local_sizes.size());
+  for (size_t i = 0, e = non_local_sizes.size(); i != e; ++i) {
+    if (non_local_sizes[i].isValid())
+      ret &= non_local_sizes[i] == rhs.non_local_sizes[i];
+  }
+
   ret &= writes_block == rhs.writes_block;
   ret &= frees_block == rhs.frees_block;
   if (writes_args.isValid())
@@ -1922,6 +1957,19 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
     return st;
   }
 
+  st.non_local_sizes.resize(num_nonlocals_src);
+  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+    Pointer p(*this, bid, false);
+    if (!p.isGrowableAlloc().isFalse()) {
+      expr max_size = p.blockMaxSize();
+      expr new_size = expr::mkFreshVar("new_blk_size", max_size);
+      state->addAxiom(new_size.uge(p.blockSize()));
+      state->addAxiom(new_size.ule(max_size));
+      st.non_local_sizes[bid] = std::move(new_size);
+    }
+  }
+
+  // TODO: handle growing size of local blocks
   // TODO: handle havoc of local blocks
 
   // inaccessible memory block
@@ -2068,6 +2116,15 @@ void Memory::setState(const Memory::CallState &st,
   }
 
   // TODO: function calls can also free local objects passed by argument
+
+  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+    Pointer p(*this, bid, false);
+    expr growable = p.isGrowableAlloc();
+    if (!growable.isFalse())
+      non_local_blk_size.replace(
+        p.getShortBid(),
+        expr::mkIf(growable, st.non_local_sizes[bid], p.blockSize()));
+  }
 
   // TODO: havoc local blocks
   // for now, zero out if in non UB-exploitation mode to avoid false positives
@@ -2217,11 +2274,11 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     store_bv(p, allocated, local_block_liveness, non_local_block_liveness);
   if (size)
     (is_local ? local_blk_size : non_local_blk_size)
-      .add(short_bid, std::move(size_zext));
+      .replace(short_bid, std::move(size_zext));
   (is_local ? local_blk_align : non_local_blk_align)
     .add(short_bid, std::move(align_expr));
   (is_local ? local_blk_kind : non_local_blk_kind)
-    .add(short_bid, expr::mkUInt(alloc_ty, 2));
+    .add(short_bid, expr::mkUInt(alloc_ty, 3));
 
   if (Pointer(*this, bid, is_local).isBlkSingleByte()) {
     if (is_local)
@@ -2939,7 +2996,8 @@ Memory Memory::mkIf(const expr &cond, Memory &&then, Memory &&els) {
   ret.local_blk_size.add(els.local_blk_size);
   ret.local_blk_align.add(els.local_blk_align);
   ret.local_blk_kind.add(els.local_blk_kind);
-  ret.non_local_blk_size.add(els.non_local_blk_size);
+  ret.non_local_blk_size
+    = FunctionExpr::mkIf(cond, then.non_local_blk_size, els.non_local_blk_size);
   ret.non_local_blk_align.add(els.non_local_blk_align);
   ret.non_local_blk_kind.add(els.non_local_blk_kind);
   ret.escaped_local_blks.unionWith(els.escaped_local_blks);
@@ -3050,9 +3108,9 @@ void Memory::print(ostream &os, const Model &m) const {
     did_header = true;
   };
 
-  if (state->isSource() && num_nonlocals) {
+  if (numNonlocals()) {
     header("NON-LOCAL BLOCKS:\n");
-    print(false, num_nonlocals);
+    print(false, numNonlocals());
   }
 
   if (numLocals()) {

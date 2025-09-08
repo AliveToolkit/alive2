@@ -216,6 +216,8 @@ public:
   void add(const expr &key, expr &&val);
   void add(const FunctionExpr &other);
 
+  void replace(const expr &key, expr &&val);
+
   std::optional<expr> operator()(const expr &key) const;
   const expr* lookup(const expr &key) const;
 
@@ -224,6 +226,9 @@ public:
   auto begin() const { return fn.begin(); }
   auto end() const { return fn.end(); }
   bool empty() const { return fn.empty(); }
+
+  static FunctionExpr mkIf(const expr &cond, const FunctionExpr &then,
+                           const FunctionExpr &els);
 
   auto operator<=>(const FunctionExpr &rhs) const = default;
 

@@ -329,6 +329,14 @@ expr Pointer::blockSize() const {
                   expr::mkUInt(0, bits_size_t));
 }
 
+expr Pointer::blockMaxSize() const {
+  return
+    mkIf_fold(getAllocType() == GROWABLE,
+              getValue("blk_max_size", m.local_blk_size, m.non_local_blk_size,
+                       expr::mkUInt(0, bits_size_t)),
+              blockSize());
+}
+
 expr Pointer::blockSizeOffsetT() const {
   expr sz = blockSize();
   return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
@@ -760,7 +768,7 @@ expr Pointer::isBlockAlive() const {
 
 expr Pointer::getAllocType() const {
   return getValue("blk_kind", m.local_blk_kind, m.non_local_blk_kind,
-                   expr::mkUInt(0, 2));
+                   expr::mkUInt(0, 3));
 }
 
 expr Pointer::isStackAllocated(bool simplify) const {
@@ -774,7 +782,11 @@ expr Pointer::isStackAllocated(bool simplify) const {
 
 expr Pointer::isHeapAllocated() const {
   assert(MALLOC == 2 && CXX_NEW == 3);
-  return getAllocType().extract(1, 1) == 1;
+  return getAllocType().extract(2, 1) == 1;
+}
+
+expr Pointer::isGrowableAlloc() const {
+  return getAllocType() == GROWABLE;
 }
 
 static expr at_least_same_offseting(const Pointer &p1, const Pointer &p2,

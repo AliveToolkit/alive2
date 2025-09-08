@@ -253,6 +253,10 @@ void FunctionExpr::add(const FunctionExpr &other) {
   fn.insert(other.fn.begin(), other.fn.end());
 }
 
+void FunctionExpr::replace(const expr &key, expr &&val) {
+  fn.insert_or_assign(key, std::move(val));
+}
+
 optional<expr> FunctionExpr::operator()(const expr &key) const {
   DisjointExpr<expr> disj;
   for (auto &[k, v] : fn) {
@@ -272,6 +276,19 @@ FunctionExpr FunctionExpr::simplify() const {
     newfn.add(k.simplify(), v.simplify());
   }
   return newfn;
+}
+
+FunctionExpr FunctionExpr::mkIf(const expr &cond, const FunctionExpr &then,
+                                const FunctionExpr &els) {
+  FunctionExpr ret;
+  auto I = els.begin();
+  for (auto &[k, v] : then) {
+    assert(I != els.end());
+    auto [k2, v2] = *I++;
+    assert(k.eq(k2));
+    ret.add(k, expr::mkIf(cond, v, v2));
+  }
+  return ret;
 }
 
 ostream& operator<<(ostream &os, const FunctionExpr &f) {

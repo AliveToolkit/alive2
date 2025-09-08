@@ -258,6 +258,7 @@ public:
   // TODO: missing local_* equivalents
   class CallState {
     std::vector<smt::expr> non_local_block_val;
+    std::vector<smt::expr> non_local_sizes;
     smt::expr non_local_liveness;
     smt::expr writes_block;
     smt::expr writes_args;

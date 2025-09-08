@@ -415,7 +415,9 @@ public:
 
 
 #define mkIf_fold(c, a, b) \
-  mkIf_fold_fn<decltype(a)>(c, [&]() { return a; }, [&]() { return b; })
+  mkIf_fold_fn<std::remove_cvref_t<decltype(a)>>( \
+      c, [&]() -> decltype(auto) { return a; }, \
+      [&]() -> decltype(auto) { return b; })
 
 template <typename RetTy, typename T1, typename T2>
 static RetTy mkIf_fold_fn(const expr &cond, T1 &&a, T2 &&b) {
