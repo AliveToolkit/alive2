@@ -1374,7 +1374,7 @@ expr Memory::hasStored(const Pointer &p, const expr &bytes) const {
   }
 }
 
-void Memory::record_store(const Pointer &p, const smt::expr &bytes) {
+void Memory::record_store(const Pointer &p, const expr &bytes) {
   assert(has_initializes_attr);
 
   auto is_local = p.isLocal();
@@ -1618,7 +1618,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
     state->addAxiom(q.isHeapAllocated().implies(q.blockAlignment() == align));
   }
 
-  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+  for (unsigned bid = skip_null(); bid < num_nonlocals_src; ++bid) {
     Pointer p(*this, bid, false);
     state->addAxiom(p.getAllocType().ult(Pointer::NUM_ALLOC_TYPES));
     state->addAxiom(p.blockSize().ule(p.blockMaxSize()));
@@ -1666,7 +1666,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
              expr::mkUInt(0, 1).concat(last.extract(bits_ptr_address-2, 0)))
          : addr != last);
     } else {
-      sz = p1.blockSizeAligned().zextOrTrunc(bits_ptr_address);
+      sz = p1.blockMaxSizeAligned().zextOrTrunc(bits_ptr_address);
       state->addAxiom(
         Pointer::hasLocalBit()
           // don't spill to local addr section
@@ -1674,7 +1674,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
           : addr.add_no_uoverflow(sz));
     }
 
-    state->addAxiom(p1.blockSize()
+    state->addAxiom(p1.blockMaxSize()
                       .round_up_bits_no_overflow(p1.blockAlignment()));
 
     if (num_nonlocals > max_quadratic_disjoint)
@@ -1686,7 +1686,7 @@ void Memory::mkAxioms(const Memory &tgt) const {
         continue;
       Pointer p2(tgt, bid2, false);
       state->addAxiom(disjoint(addr, sz, align, p2.getAddress(),
-                               p2.blockSizeAligned()
+                               p2.blockMaxSizeAligned()
                                  .zextOrTrunc(bits_ptr_address),
                                p2.blockAlignment()));
     }
@@ -1958,7 +1958,7 @@ Memory::mkCallState(const string &fnname, bool nofree, unsigned num_ptr_args,
   }
 
   st.non_local_sizes.resize(num_nonlocals_src);
-  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+  for (unsigned bid = skip_null(); bid < num_nonlocals_src; ++bid) {
     Pointer p(*this, bid, false);
     if (!p.isGrowableAlloc().isFalse()) {
       expr max_size = p.blockMaxSize();
@@ -2117,9 +2117,9 @@ void Memory::setState(const Memory::CallState &st,
 
   // TODO: function calls can also free local objects passed by argument
 
-  for (unsigned bid = has_null_block; bid < num_nonlocals_src; ++bid) {
+  for (unsigned bid = skip_null(); bid < num_nonlocals_src; ++bid) {
     Pointer p(*this, bid, false);
-    expr growable = p.isGrowableAlloc();
+    expr growable = p.isGrowableAlloc() && access.canWrite(MemoryAccess::Other);
     if (!growable.isFalse())
       non_local_blk_size.replace(
         p.getShortBid(),

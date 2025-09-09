@@ -4056,13 +4056,13 @@ StateValue GEP::toSMT(State &s) const {
       // FIXME: not implemented for physical pointers
       s.addUB(ptr.isLogical());
       s.doesApproximation("gep inbounds of phy ptr", !ptr.isLogical(), true);
-      inbounds_np.add(ptr.inbounds(false));
+      inbounds_np.add(ptr.inbounds(false, true));
     }
 
     expr offset_sum = expr::mkUInt(0, bits_for_offset);
     for (auto &[sz, idx] : offsets) {
       auto &[v, np] = idx;
-      auto multiplier = expr::mkUInt(sz, bits_for_offset);
+      auto multiplier = expr::mkUInt(sz, offset_sum);
       auto val = v.sextOrTrunc(bits_for_offset);
       auto inc = multiplier * val;
 
@@ -4100,7 +4100,7 @@ StateValue GEP::toSMT(State &s) const {
       non_poison.add(np);
 
       if (inbounds)
-        inbounds_np.add(ptr.inbounds(false));
+        inbounds_np.add(ptr.inbounds(false, true));
     }
 
     if (inbounds) {
@@ -4114,7 +4114,7 @@ StateValue GEP::toSMT(State &s) const {
 
       // try to simplify the pointer
       if (all_zeros.isFalse())
-        ptr.inbounds(true);
+        ptr.inbounds(true, true);
     }
 
     return { std::move(ptr).release(), non_poison() };

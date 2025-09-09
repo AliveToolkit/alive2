@@ -78,7 +78,7 @@ Pointer::Pointer(const Memory &m, const expr &bid, const expr &offset,
 }
 
 Pointer::Pointer(const Memory &m, const char *var_name,
-                 const ParamAttrs &attr, const std::set<smt::expr> &fn_vars)
+                 const ParamAttrs &attr, const set<expr> &fn_vars)
   : m(const_cast<Memory&>(m)) {
   auto ty = expr::mkUInt(0, bitsShortBid() + bits_for_offset);
   vector<expr> vars(fn_vars.begin(), fn_vars.end());
@@ -332,7 +332,7 @@ expr Pointer::blockSize() const {
 expr Pointer::blockMaxSize() const {
   return
     mkIf_fold(getAllocType() == GROWABLE,
-              getValue("blk_max_size", m.local_blk_size, m.non_local_blk_size,
+              getValue("blk_max_size", m.local_blk_size, {},
                        expr::mkUInt(0, bits_size_t)),
               blockSize());
 }
@@ -348,6 +348,16 @@ expr Pointer::blockSizeAligned() const {
 
 expr Pointer::blockSizeAlignedOffsetT() const {
   expr sz = blockSizeAligned();
+  return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
+}
+
+expr Pointer::blockMaxSizeAligned() const {
+  return
+    blockMaxSize().round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
+}
+
+expr Pointer::blockMaxSizeAlignedOffsetT() const {
+  expr sz = blockMaxSizeAligned();
   return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
 }
 
@@ -447,22 +457,23 @@ expr Pointer::isInboundsOf(const Pointer &block, const expr &bytes0,
          (addr + bytes).ule(block_addr + block_size);
 }
 
-expr Pointer::isInbounds(bool strict) const {
+expr Pointer::isInbounds(bool strict, bool max_size) const {
   auto offset = getOffsetSizet();
-  auto size   = blockSizeAlignedOffsetT();
+  auto size   = max_size ? blockMaxSizeAlignedOffsetT()
+                         : blockSizeAlignedOffsetT();
   expr ret = strict ? offset.ult(size) : offset.ule(size);
   if (bits_for_offset <= bits_size_t) // implied
     ret &= !offset.isNegative();
   return ret;
 }
 
-expr Pointer::inbounds(bool simplify_ptr) {
+expr Pointer::inbounds(bool simplify_ptr, bool max_size) {
   if (!simplify_ptr)
-    return isInbounds(false);
+    return isInbounds(false, max_size);
 
   DisjointExpr<expr> ret(expr(false)), all_ptrs;
   for (auto &[ptr_expr, domain] : DisjointExpr<expr>(p, 3)) {
-    expr inb = Pointer(m, ptr_expr).isInbounds(false);
+    expr inb = Pointer(m, ptr_expr).isInbounds(false, max_size);
     if (!inb.isFalse())
       all_ptrs.add(ptr_expr, domain);
     ret.add(std::move(inb), domain);
