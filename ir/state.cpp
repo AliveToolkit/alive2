@@ -940,10 +940,15 @@ void State::addUnreachable() {
   unreachable_paths.add(domain());
 }
 
-expr State::FnCallInput::implies(const FnCallInput &rhs) const {
-  if (noret != rhs.noret || willret != rhs.willret ||
-      (rhs.memaccess.canReadSomething().isTrue() &&
-        (fncall_ranges != rhs.fncall_ranges || is_neq(m <=> rhs.m))))
+expr State::FnCallInput::refines(const FnCallInput &rhs) const {
+  if (rhs.memaccess.canReadSomething().isTrue() &&
+      (fncall_ranges != rhs.fncall_ranges || is_neq(m <=> rhs.m)))
+    return false;
+
+  // we can remove attributes, but not add new ones
+  if (noret && !rhs.noret)
+    return false;
+  if (willret && !rhs.willret)
     return false;
 
   AndExpr eq;
@@ -966,9 +971,13 @@ expr State::FnCallInput::refinedBy(
   const Memory &m2, const SMTMemoryAccess &memaccess2, bool noret2,
   bool willret2) const {
 
-  if (noret != noret2 ||
-      willret != willret2 ||
-      !fncall_ranges.overlaps(callee, memaccess2, fncall_ranges2))
+  if (!fncall_ranges.overlaps(callee, memaccess2, fncall_ranges2))
+    return false;
+
+  // we can remove attributes, but not add new ones
+  if (noret2 && !noret)
+    return false;
+  if (willret2 && !willret)
     return false;
 
   AndExpr refines;
@@ -1051,7 +1060,7 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   return ret;
 }
 
-expr State::FnCallOutput::implies(const FnCallOutput &rhs,
+expr State::FnCallOutput::refines(const FnCallOutput &rhs,
                                   const Type &retval_ty) const {
   expr ret = ub == rhs.ub;
   ret     &= noreturns == rhs.noreturns;
@@ -1260,9 +1269,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
         if (II == I)
           continue;
-        auto in_eq = I->first.implies(II->first);
+        auto in_eq = I->first.refines(II->first);
         if (!in_eq.isFalse())
-          fn_call_pre &= in_eq.implies(I->second.implies(II->second, out_type));
+          fn_call_pre &= in_eq.implies(I->second.refines(II->second, out_type));
       }
     }
 
