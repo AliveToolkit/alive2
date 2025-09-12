@@ -1706,10 +1706,10 @@ void Memory::mkAxioms(const Memory &tgt) const {
       expr::mkForAll(2, vars, names,
         bid1 == bid2 ||
         disjoint(p1.getAddress(),
-                 p1.blockSizeAligned().zextOrTrunc(bits_ptr_address),
+                 p1.blockMaxSizeAligned().zextOrTrunc(bits_ptr_address),
                  p1.blockAlignment(),
                  p2.getAddress(),
-                 p2.blockSizeAligned().zextOrTrunc(bits_ptr_address),
+                 p2.blockMaxSizeAligned().zextOrTrunc(bits_ptr_address),
                  p2.blockAlignment())));
   }
 }
