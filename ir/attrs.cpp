@@ -672,10 +672,11 @@ void TailCallInfo::check(State &s, const Instr &i,
   // Exception: alloca or byval arg may be passed to the callee as byval
   for (const auto &arg : args) {
     Pointer ptr(s.getMemory(), arg.val.value);
-    s.addUB(arg.val.non_poison.implies(
+    // if the ptr is poison, it can be replaced by an alloca
+    s.addUB(arg.val.non_poison &&
       (ptr.isStackAllocated() || ptr.isByval()).implies(arg.byval != 0) &&
       true // TODO: check for !var_args
-    ));
+    );
   }
 
   if (type != TailCallInfo::MustTail)
