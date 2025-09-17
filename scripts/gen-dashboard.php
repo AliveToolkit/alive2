@@ -26,13 +26,12 @@ $fail_without_undef = 0;
 foreach ($test_failures as $test) {
   if (!preg_match('@'.$test.'\' FAILED \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\n'.
                   'Exit Code:[^\n]+\n\n'.
-                  '(?:Command Output \(stdout\):\n--.*?\n--\n)?'.
-                  'Command Output \(stderr\):\n--(.*?)\n--\n@Ss', $dump, $m)) {
+                  'Command Output \(stdout\):\n--.*?\n--\n@Ss', $dump, $m)) {
     die("Failed to get data for $test\n");
   }
 
-  $err = $m[1];
-  $stderr = store_log(preg_replace('/Report written to \S+/S', '', $err));
+  $err = $m[0];
+  $stderr = store_log(preg_replace('/^.*Report written to .*\n/Sm', '', $err));
   $func = null;
 
   preg_match('/Report written to "(\S+)"/S', $err, $m);
