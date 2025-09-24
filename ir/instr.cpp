@@ -4246,7 +4246,7 @@ DEFINE_AS_RETZEROALIGN(Load, getMaxAllocSize)
 DEFINE_AS_RETZERO(Load, getMaxGEPOffset)
 
 uint64_t Load::getMaxAccessSize() const {
-  return round_up(Memory::getStoreByteSize(getType()), align);
+  return Memory::getStoreByteSize(getType());
 }
 
 MemInstr::ByteAccessInfo Load::getByteAccessInfo() const {
@@ -4292,7 +4292,7 @@ DEFINE_AS_RETZEROALIGN(Store, getMaxAllocSize)
 DEFINE_AS_RETZERO(Store, getMaxGEPOffset)
 
 uint64_t Store::getMaxAccessSize() const {
-  return round_up(Memory::getStoreByteSize(val->getType()), align);
+  return Memory::getStoreByteSize(val->getType());
 }
 
 MemInstr::ByteAccessInfo Store::getByteAccessInfo() const {

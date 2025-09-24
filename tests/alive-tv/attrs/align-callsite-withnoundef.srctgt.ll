@@ -1,5 +1,3 @@
-; ERROR: Source is more defined than target
-
 define void @src(ptr %p) {
   call void @g(ptr %p)
   load i8, ptr %p

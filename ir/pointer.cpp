@@ -342,22 +342,8 @@ expr Pointer::blockSizeOffsetT() const {
   return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
 }
 
-expr Pointer::blockSizeAligned() const {
-  return blockSize().round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
-}
-
-expr Pointer::blockSizeAlignedOffsetT() const {
-  expr sz = blockSizeAligned();
-  return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
-}
-
-expr Pointer::blockMaxSizeAligned() const {
-  return
-    blockMaxSize().round_up_bits(blockAlignment().zextOrTrunc(bits_size_t));
-}
-
-expr Pointer::blockMaxSizeAlignedOffsetT() const {
-  expr sz = blockMaxSizeAligned();
+expr Pointer::blockMaxSizeOffsetT() const {
+  expr sz = blockMaxSize();
   return bits_for_offset > bits_size_t ? sz.zextOrTrunc(bits_for_offset) : sz;
 }
 
@@ -428,7 +414,7 @@ expr Pointer::isOfBlock(const Pointer &block, const expr &bytes,
   assert(block.getOffset().isZero());
   expr addr       = is_phy ? getPhysicalAddress() : getAddress();
   expr block_addr = block.getLogAddress();
-  expr block_size = block.blockSizeAlignedOffsetT();
+  expr block_size = block.blockSizeOffsetT();
 
   if (bytes.eq(block_size))
     return addr == block_addr;
@@ -445,7 +431,7 @@ expr Pointer::isInboundsOf(const Pointer &block, const expr &bytes0,
   expr bytes = bytes0.zextOrTrunc(bits_ptr_address);
   expr addr  = is_phy ? getPhysicalAddress() : getAddress();
   expr block_addr = block.getLogAddress();
-  expr block_size = block.blockSizeAligned().zextOrTrunc(bits_ptr_address);
+  expr block_size = block.blockSize().zextOrTrunc(bits_ptr_address);
 
   if (bytes.eq(block_size))
     return addr == block_addr;
@@ -459,8 +445,8 @@ expr Pointer::isInboundsOf(const Pointer &block, const expr &bytes0,
 
 expr Pointer::isInbounds(bool strict, bool max_size) const {
   auto offset = getOffsetSizet();
-  auto size   = max_size ? blockMaxSizeAlignedOffsetT()
-                         : blockSizeAlignedOffsetT();
+  auto size   = max_size ? blockMaxSizeOffsetT()
+                         : blockSizeOffsetT();
   expr ret = strict ? offset.ult(size) : offset.ule(size);
   if (bits_for_offset <= bits_size_t) // implied
     ret &= !offset.isNegative();
@@ -548,12 +534,9 @@ expr Pointer::isAligned(const expr &align) {
 // When bytes is 0, pointer is always dereferenceable
 pair<AndExpr, expr>
 Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
-                           bool iswrite, bool ignore_accessability,
-                           bool round_size_to_align) {
+                           bool iswrite, bool ignore_accessability) {
   bool is_asm = m.state->isAsmMode();
   expr bytes = bytes0.zextOrTrunc(bits_for_offset);
-  if (round_size_to_align)
-    bytes = bytes.round_up(expr::mkUInt(align, bytes));
 
   auto block_constraints = [&](const Pointer &p) {
     expr ret = p.isBlockAlive();
@@ -588,7 +571,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
   };
 
   auto log_ptr = [&](Pointer &p) {
-    expr block_sz = p.blockSizeAlignedOffsetT();
+    expr block_sz = p.blockSizeOffsetT();
     expr offset   = p.getOffset();
 
     expr cond;
@@ -632,7 +615,7 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
         Pointer this_ptr(m, i, local, p.getAttrs());
 
-        bool same_size = bytes.eq(this_ptr.blockSizeAlignedOffsetT());
+        bool same_size = bytes.eq(this_ptr.blockSizeOffsetT());
         expr this_addr = this_ptr.getLogAddress();
         expr offset = same_size ? expr::mkUInt(0, addr) : addr - this_addr;
 
@@ -749,10 +732,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
 
 pair<AndExpr, expr>
 Pointer::isDereferenceable(uint64_t bytes, uint64_t align,
-                           bool iswrite, bool ignore_accessability,
-                           bool round_size_to_align) {
+                           bool iswrite, bool ignore_accessability) {
   return isDereferenceable(expr::mkUInt(bytes, bits_size_t), align, iswrite,
-                           ignore_accessability, round_size_to_align);
+                           ignore_accessability);
 }
 
 // This function assumes that both begin + len don't overflow
@@ -971,7 +953,7 @@ expr Pointer::isNull() const {
 
 bool Pointer::isBlkSingleByte() const {
   uint64_t blk_size;
-  return blockSizeAligned().isUInt(blk_size) && blk_size == bits_byte/8;
+  return blockSize().isUInt(blk_size) && blk_size == bits_byte/8;
 }
 
 pair<Pointer, expr> Pointer::findLogicalLocalPointer(const expr &addr) const {

@@ -90,10 +90,7 @@ public:
   smt::expr blockSize() const;
   smt::expr blockMaxSize() const;
   smt::expr blockSizeOffsetT() const; // to compare with offsets
-  smt::expr blockSizeAligned() const;
-  smt::expr blockSizeAlignedOffsetT() const; // to compare with offsets
-  smt::expr blockMaxSizeAligned() const;
-  smt::expr blockMaxSizeAlignedOffsetT() const;
+  smt::expr blockMaxSizeOffsetT() const; // to compare with offsets
 
   smt::expr leftoverSize() const;
 
@@ -131,12 +128,10 @@ public:
   smt::expr isAligned(const smt::expr &align);
   std::pair<smt::AndExpr, smt::expr>
   isDereferenceable(uint64_t bytes, uint64_t align, bool iswrite = false,
-                    bool ignore_accessability = false,
-                    bool round_size_to_align = true);
+                    bool ignore_accessability = false);
   std::pair<smt::AndExpr, smt::expr>
   isDereferenceable(const smt::expr &bytes, uint64_t align, bool iswrite,
-                    bool ignore_accessability = false,
-                    bool round_size_to_align = true);
+                    bool ignore_accessability = false);
 
   void isDisjointOrEqual(const smt::expr &len1, const Pointer &ptr2,
                          const smt::expr &len2) const;
