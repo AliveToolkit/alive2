@@ -1179,6 +1179,14 @@ public:
       PARSE_BINOP();
       return make_unique<VaCopy>(*a, *b);
     }
+    case llvm::Intrinsic::vscale: {
+      auto ty = llvm_type2alive(i.getType());
+      if (!ty)
+        return error(i);
+      // llvm.vscale() always returns 1
+      auto val = make_intconst(1, ty->bits());
+      return make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::Copy);
+    }
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_declare:

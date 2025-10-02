@@ -198,8 +198,8 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
-  // TODO: non-fixed sized vectors
-  case llvm::Type::FixedVectorTyID: {
+  case llvm::Type::FixedVectorTyID:
+  case llvm::Type::ScalableVectorTyID: {
     auto &cache = type_cache[ty];
     if (!cache) {
       auto vty = cast<llvm::VectorType>(ty);
