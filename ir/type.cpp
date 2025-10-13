@@ -1090,6 +1090,11 @@ void ArrayType::print(ostream &os) const {
 }
 
 
+expr VectorType::vscale() const {
+  return defined ? expr::mkUInt(vscale_value, var_vector_elements) :
+                   var("vscale", var_vector_elements);
+}
+
 VectorType::VectorType(string &&name, unsigned elems, Type &elTy, bool scal)
   : AggregateType(std::move(name), false), scalable(scal), min_elements(elems) {
   assert(elems != 0);

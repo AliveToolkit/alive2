@@ -338,9 +338,10 @@ public:
 class VectorType final : public AggregateType {
 private:
   bool scalable = false;
-  unsigned min_elements;
+  unsigned min_elements, vscale_value;
 
 public:
+  smt::expr vscale() const;
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
   VectorType(std::string &&name, unsigned elems, Type &elemTy, bool scalable);
 
