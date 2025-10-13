@@ -1180,6 +1180,12 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
+void VectorType::fixup(const Model &m) {
+  if (!defined)
+    vscale_value = m.getUInt(vscale());
+  AggregateType::fixup(m);
+}
+
 expr VectorType::enforceVectorType(
     const function<expr(const Type&)> &enforceElem) const {
   return enforceElem(*children[0]);

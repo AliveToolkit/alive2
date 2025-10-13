@@ -354,6 +354,7 @@ public:
   unsigned maxSubBitAccess() const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
+  void fixup(const smt::Model &m) override;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
