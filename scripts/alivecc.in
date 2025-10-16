@@ -108,6 +108,14 @@ if (compiling()) {
         push @ARGV, ("-mllvm", "-tv-save-ir");
     }
 
+    if (my $unroll = getenv("ALIVECC_SRC_UNROLL")) {
+        push @ARGV, ("-mllvm", "-tv-src-unroll=".$unroll);
+    }
+
+    if (my $unroll = getenv("ALIVECC_TGT_UNROLL")) {
+        push @ARGV, ("-mllvm", "-tv-tgt-unroll=".$unroll);
+    }
+
     # sanity check: make sure we intercepted all environment variables
     # of the form ALIVECC_*
     foreach my $e (keys %ENV) {
