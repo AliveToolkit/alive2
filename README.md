@@ -141,7 +141,7 @@ We run this command on the main LLVM branch each day, and keep track of the resu
 [here](https://web.ist.utl.pt/nuno.lopes/alive2/).  To detect unsound transformations in a local run:
 
 ```
-fgrep -r "(unsound)" ~/alive2/build/logs/
+grep -Fr "(unsound)" ~/alive2/build/logs/
 ```
 
 
