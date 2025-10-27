@@ -233,6 +233,8 @@ private:
     Memory::CallState callstate;
     std::vector<Memory::FnRetData> ret_data;
 
+    // Add non-deterministic local_blk_size variable member
+
     FnCallOutput replace(const StateValue &retval) const;
 
     static FnCallOutput mkIf(const smt::expr &cond, const FnCallOutput &then,
@@ -240,6 +242,9 @@ private:
     smt::expr refines(const FnCallOutput &rhs, const Type &retval_ty) const;
     auto operator<=>(const FnCallOutput &rhs) const = default;
   };
+
+  // Add non-deterministic local_blk_size variable member and pending variable to access it
+
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
   smt::expr fn_call_pre = true;
   std::set<smt::expr> fn_call_qvars;

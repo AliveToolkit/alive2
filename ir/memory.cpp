@@ -1717,6 +1717,8 @@ void Memory::syncWithSrc(const Memory &src) {
   next_nonlocal_bid = src.next_nonlocal_bid;
   ptr_alias = src.ptr_alias;
   // TODO: copy alias info for fn return ptrs from src?
+  
+  // Add synchronizing non-deterministic variables for local_blk_size
 }
 
 void Memory::markByVal(unsigned bid, bool is_const) {
@@ -2261,6 +2263,8 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
   if (size)
     (is_local ? local_blk_size : non_local_blk_size)
       .replace(short_bid, std::move(size_zext));
+    // If size is unknown in the above condition, add a non-det variable for size
+    // and add it as a member of the FnCallOutput structure with the key being the function name and bid
   (is_local ? local_blk_align : non_local_blk_align)
     .add(short_bid, std::move(align_expr));
   (is_local ? local_blk_kind : non_local_blk_kind)
