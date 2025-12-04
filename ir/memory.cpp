@@ -1717,6 +1717,7 @@ void Memory::syncWithSrc(const Memory &src) {
   next_nonlocal_bid = src.next_nonlocal_bid;
   ptr_alias = src.ptr_alias;
   // TODO: copy alias info for fn return ptrs from src?
+  
 }
 
 void Memory::markByVal(unsigned bid, bool is_const) {
