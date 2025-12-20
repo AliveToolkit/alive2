@@ -240,6 +240,7 @@ space+ {
 "fmaximumnum" { return FMAXIMUMNUM; }
 "fminimumnum" { return FMINIMUMNUM; }
 "frexp" { return FREXP; }
+"ldexp" { return LDEXP; }
 "extractelement" { return EXTRACTELEMENT; }
 "insertelement" { return INSERTELEMENT; }
 "shufflevector" { return SHUFFLEVECTOR; }

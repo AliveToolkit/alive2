@@ -990,6 +990,13 @@ public:
                                  parse_rounding(i), parse_exceptions(i));
       break;
     }
+    case llvm::Intrinsic::experimental_constrained_ldexp:
+    case llvm::Intrinsic::ldexp: {
+      PARSE_BINOP();
+      ret = make_unique<FpIntOp>(*ty, value_name(i), *a, *b, FpIntOp::LdExp,
+                                 parse_rounding(i), parse_exceptions(i));
+      break;
+    }
     case llvm::Intrinsic::canonicalize:
     case llvm::Intrinsic::fabs:
     case llvm::Intrinsic::ceil:

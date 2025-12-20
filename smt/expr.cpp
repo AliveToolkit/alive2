@@ -1283,6 +1283,45 @@ expr expr::sqrt(const expr &rm) const {
   return simplify_const(Z3_mk_fpa_sqrt(ctx(), rm(), ast()), *this);
 }
 
+expr expr::ldexp(const expr &rhs, const expr &rm) const {
+  C(rhs, rm);
+  unsigned bits_exponent = Z3_fpa_get_ebits(ctx(), sort());
+  unsigned bits_mantissa = Z3_fpa_get_sbits(ctx(), sort()) - 1;
+  unsigned exp_bw = std::max(32U, rhs.bits());
+
+  int64_t bias     = ((int64_t)1 << (bits_exponent - 1)) - 1;
+  int64_t min_norm = 1 - bias;
+  int64_t min_sub  = min_norm - (int64_t)bits_mantissa;
+  int64_t max_norm = ((int64_t)1 << bits_exponent) - 2 - bias;
+
+  expr rhs_ext    = rhs.sextOrTrunc(exp_bw);
+  expr min_norm_e = expr::mkInt(min_norm, exp_bw);
+  expr min_sub_e  = expr::mkInt(min_sub, exp_bw);
+  expr max_norm_e = expr::mkInt(max_norm, exp_bw);
+
+  expr too_small = rhs_ext.slt(min_sub_e);
+  expr too_large = rhs_ext.sgt(max_norm_e);
+  expr subnormal = rhs_ext.slt(min_norm_e) && !too_small;
+
+  expr exp_field    = (rhs_ext + expr::mkInt(bias, exp_bw)).trunc(bits_exponent);
+  expr shift        = (rhs_ext - min_sub_e).zextOrTrunc(bits_mantissa);
+  expr mantissa_sub = expr::mkUInt(1, bits_mantissa) << shift;
+
+  expr exp_bits =
+    expr::mkIf(too_large,
+               expr::mkInt(-1, bits_exponent),
+               expr::mkIf(subnormal || too_small,
+                          expr::mkUInt(0, bits_exponent),
+                          exp_field));
+  expr mant_bits =
+    expr::mkIf(subnormal, mantissa_sub, expr::mkUInt(0, bits_mantissa));
+
+  expr pow2_bv = expr::mkUInt(0, 1).concat(exp_bits).concat(mant_bits);
+  expr pow2    = pow2_bv.BV2float(*this);
+  expr scaled  = fmul(pow2, rm);
+  return expr::mkIf(isNaN() || isInf() || isFPZero(), *this, scaled);
+}
+
 std::pair<expr, expr> expr::frexp() const {
   C();
   unsigned bits_exponent = Z3_fpa_get_ebits(ctx(), sort());

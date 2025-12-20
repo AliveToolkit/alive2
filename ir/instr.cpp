@@ -969,6 +969,101 @@ unique_ptr<Instr> FpBinOp::dup(Function &f, const string &suffix) const {
                               fmath, rm, ex);
 }
 
+vector<Value *> FpIntOp::operands() const {
+  return {lhs, rhs};
+}
+
+bool FpIntOp::propagatesPoison() const {
+  return true;
+}
+
+bool FpIntOp::hasSideEffects() const {
+  return false;
+}
+
+void FpIntOp::rauw(const Value &what, Value &with) {
+  RAUW(lhs);
+  RAUW(rhs);
+}
+
+void FpIntOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case LdExp:
+    str = "ldexp ";
+    break;
+  }
+  os << getName() << " = " << str << *lhs << ", " << rhs->getName();
+  if (!rm.isDefault())
+    os << ", rounding=" << rm;
+  if (!ex.ignore())
+    os << ", exceptions=" << ex;
+}
+
+StateValue FpIntOp::toSMT(State &s) const {
+  assert(op == LdExp);
+
+  auto &a = s[*lhs];
+  auto &b = s[*rhs];
+
+  auto scalar = [&](const StateValue &a, const StateValue &b,
+                    const Type &ty) -> StateValue {
+    AndExpr non_poison;
+    non_poison.add(a.non_poison);
+    non_poison.add(b.non_poison);
+
+    if (!ty.isFloatType())
+      return StateValue(a.value.ldexp(b.value, expr::rne()), non_poison());
+
+    auto &fpty = *ty.getAsFloatType();
+    expr fp_a = fpty.getFloat(a.value);
+    auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(ty).input;
+    fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a));
+
+    function<expr(const expr &)> fn_rm = [&](auto &rm_in) {
+      return fp_a.ldexp(b.value, rm_in);
+    };
+    expr val = round_value(s, rm, non_poison, fn_rm);
+
+    val = handle_subnormal(s, s.getFn().getFnAttrs().getFPDenormal(ty).output,
+                           std::move(val));
+    val = fpty.fromFloat(s, val, fpty, 1, a.value);
+
+    return StateValue(std::move(val), non_poison());
+  };
+
+  if (lhs->getType().isVectorType()) {
+    auto retty = getType().getAsAggregateType();
+    vector<StateValue> vals;
+    for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
+      vals.emplace_back(scalar(retty->extract(a, i), retty->extract(b, i),
+                               retty->getChild(i)));
+    }
+    return retty->aggregateVals(vals);
+  }
+  return scalar(a, b, getType());
+}
+
+expr FpIntOp::getTypeConstraints(const Function &f) const {
+  expr sameNumElements = false;
+  if (auto *agg1 = getType().getAsAggregateType()) {
+    if (auto *agg2 = rhs->getType().getAsAggregateType())
+      sameNumElements = agg1->numElements() == agg2->numElements();
+  } else {
+    sameNumElements = getType().isFloatType() && rhs->getType().isIntType();
+  }
+
+  return Value::getTypeConstraints() &&
+         getType().enforceFloatOrVectorType() &&
+         getType() == lhs->getType() &&
+         rhs->getType().enforceIntOrVectorType() &&
+         sameNumElements;
+}
+
+unique_ptr<Instr> FpIntOp::dup(Function &f, const string &suffix) const {
+  return make_unique<FpIntOp>(getType(), getName()+suffix, *lhs, *rhs, op, rm, 
+                              ex);
+}
 
 vector<Value*> UnaryOp::operands() const {
   return { val };

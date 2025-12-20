@@ -1,0 +1,39 @@
+Name: ldexp +0
+%t = ldexp float 0.0, i32 5
+    =>
+%t = 0.0
+
+Name: ldexp -0
+%t = ldexp float -0.0, i32 5
+    =>
+%t = -0.0
+
+Name: ldexp inf
+%t = ldexp float 0x7f800000, i32 -3
+    =>
+%t = float 0x7f800000
+
+Name: ldexp -inf
+%t = ldexp float 0xff800000, i32 7
+    =>
+%t = float 0xff800000
+
+Name: ldexp nan
+%t = ldexp float 0x7fc00000, i32 1
+    =>
+%t = float 0x7fc00000
+
+Name: ldexp underflow
+%t = ldexp float -1.0, i32 -200
+    =>
+%t = -0.0
+
+Name: ldexp overflow
+%t = ldexp float -1.0, i32 200
+    =>
+%t = float 0xff800000
+
+Name: ldexp exact
+%t = ldexp float 4.0, i32 -2
+    =>
+%t = 1.0
