@@ -1034,9 +1034,11 @@ StateValue FpIntOp::toSMT(State &s) const {
 
   if (lhs->getType().isVectorType()) {
     auto retty = getType().getAsAggregateType();
+    auto aty = lhs->getType().getAsAggregateType();
+    auto bty = rhs->getType().getAsAggregateType();
     vector<StateValue> vals;
     for (unsigned i = 0, e = retty->numElementsConst(); i != e; ++i) {
-      vals.emplace_back(scalar(retty->extract(a, i), retty->extract(b, i),
+      vals.emplace_back(scalar(aty->extract(a, i), bty->extract(b, i),
                                retty->getChild(i)));
     }
     return retty->aggregateVals(vals);
