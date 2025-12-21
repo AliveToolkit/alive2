@@ -34,6 +34,52 @@ Name: ldexp overflow
 %t = float 0xff800000
 
 Name: ldexp exact
-%t = ldexp float 4.0, i32 -2
+%t = ldexp float 4.0, i32 7
     =>
-%t = 1.0
+%t = 512.0
+
+Name: ldexp -exact
+%t = ldexp float 7.0, i32 -9
+    =>
+%t = 0.013671875
+
+Name: ldexp combine
+%r = ldexp float 2.5, i32 77
+%t = ldexp float %r, i32 -77
+    =>
+%t = 2.5
+
+Name: ldexp float exact i7
+%t = ldexp float 1.25, i7 3
+    =>
+%t = 10.0
+
+Name: ldexp half exact i7
+%t = ldexp half 0.5, i7 1
+    =>
+%t = half 1.0
+
+Name: ldexp half neg i7
+%t = ldexp half 6.0, i7 -1
+    =>
+%t = half 3.0
+
+Name: ldexp half underflow i13
+%t = ldexp half 1.0, i13 -30
+    =>
+%t = half 0.0
+
+Name: ldexp double exact i7
+%t = ldexp double 3.25, i7 2
+    =>
+%t = double 13.0
+
+Name: ldexp double neg exp i13
+%t = ldexp double 8.0, i13 -3
+    =>
+%t = double 1.0
+
+Name: ldexp vec
+%t = ldexp <5 x double> <double 1.0, double 1.0, double 1.0, double 1.0, double 1.0>, <5 x i8> <i8 -2, i8 -1, i8 0, i8 1, i8 2>
+    =>
+%t = <5 x double> <double 0.25, double 0.5, double 1.0, double 2.0, double 4.0>
