@@ -814,6 +814,23 @@ static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
                               FpRoundingMode(), FpExceptionMode());
 }
 
+static unique_ptr<Instr> parse_fp_intop(string_view name, token op_token) {
+  auto &type = parse_type();
+  auto &a = parse_operand(type);
+  parse_comma();
+  auto &type_rhs = parse_type();
+  auto &b = parse_operand(type_rhs);
+
+  FpIntOp::Op op;
+  switch (op_token) {
+  case LDEXP: op = FpIntOp::LdExp; break;
+  default:
+    UNREACHABLE();
+  }
+  return make_unique<FpIntOp>(type, string(name), a, b, op,
+                              FpRoundingMode(), FpExceptionMode());
+}
+
 static unique_ptr<Instr> parse_unaryop(string_view name, token op_token) {
   UnaryOp::Op op;
   switch (op_token) {
@@ -1264,6 +1281,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FMAXIMUMNUM:
   case FMINIMUMNUM:
     return parse_fp_binop(name, t);
+  case LDEXP:
+    return parse_fp_intop(name, t);
   case BITREVERSE:
   case BSWAP:
   case CTPOP:
