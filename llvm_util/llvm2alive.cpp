@@ -1179,6 +1179,13 @@ public:
       PARSE_BINOP();
       return make_unique<VaCopy>(*a, *b);
     }
+    case llvm::Intrinsic::vscale: {
+      auto ty = llvm_type2alive(i.getType());
+      if (!ty)
+        return error(i);
+      auto val = make_intconst(config::vscale_value, ty->bits());
+      return make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::Copy);
+    }
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_declare:
@@ -1287,8 +1294,17 @@ public:
   RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
     PARSE_BINOP();
     vector<unsigned> mask;
-    for (auto m : i.getShuffleMask())
-      mask.push_back(m);
+
+    unsigned replicate = 1;
+    if (i.getType()->isScalableTy()) {
+      replicate = config::vscale_value;
+    }
+
+    auto &&sm = i.getShuffleMask();
+    for (unsigned j = 0; j < replicate; j++) {
+      mask.insert(mask.end(), sm.begin(), sm.end());
+    }
+
     return
       make_unique<ShuffleVector>(*ty, value_name(i), *a, *b, std::move(mask));
   }
