@@ -2682,9 +2682,24 @@ StateValue FnCall::toSMT(State &s) const {
   };
 
   if (attrs.has(AllocKind::Alloc) ||
-      attrs.has(AllocKind::Realloc) ||
-      attrs.has(FnAttrs::AllocSize)) {
-    auto [size, np_size] = attrs.computeAllocSize(s, args);
+      attrs.has(AllocKind::Realloc)) {
+
+    smt::expr size;
+    smt::expr np_size;
+    
+    if (!attrs.has(FnAttrs::AllocSize)) {
+      auto result = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
+                         std::move(ptr_inputs), getType(), std::move(ret_val),
+                         ret_arg_ty, std::move(ret_vals), attrs, indirect_hash);
+      auto retval =std::move(result.retval);
+      size = std::move(result.alloc_size.value());
+      np_size = expr(true);
+    } else {
+      auto result = attrs.computeAllocSize(s, args);
+      size = std::move(result.first);
+      np_size = std::move(result.second);
+    }
+
     expr nonnull = attrs.isNonNull() ? expr(true)
                                      : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
@@ -2755,7 +2770,7 @@ StateValue FnCall::toSMT(State &s) const {
     return {};
   }
 
-  auto ret = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
+  auto [ret, alloc_size] = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
                          std::move(ptr_inputs), getType(), std::move(ret_val),
                          ret_arg_ty, std::move(ret_vals), attrs, indirect_hash);
 
