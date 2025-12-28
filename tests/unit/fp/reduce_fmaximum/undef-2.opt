@@ -1,0 +1,8 @@
+Name: t0
+%t0 = insertelement <2 x float> %x, float undef, i8 1
+%r = reduce_fminimum <2 x float> %t0
+  =>
+%r = undef
+
+; ERROR: Value mismatch for float %r
+

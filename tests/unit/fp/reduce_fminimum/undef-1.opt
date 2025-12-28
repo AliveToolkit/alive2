@@ -1,0 +1,5 @@
+Name: t0
+%r = reduce_fminimum <2 x float> undef
+  =>
+%r = undef
+

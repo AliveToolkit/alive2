@@ -1,0 +1,7 @@
+Name: t0
+%r = reduce_fminimum <2 x float> %x
+  =>
+%r = poison
+
+; ERROR: Target is more poisonous than source for float %r
+
