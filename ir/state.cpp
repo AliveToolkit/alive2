@@ -896,6 +896,12 @@ void State::addAxiom(expr &&axiom) {
   axioms.add(std::move(axiom));
 }
 
+void State::addPre(expr &&cond, bool quantify_undefs) {
+  if (quantify_undefs && !cond.isConst())
+    quantified_vars.insert(undef_vars.begin(), undef_vars.end());
+  precondition.add(std::move(cond));
+}
+
 void State::addUB(pair<AndExpr, expr> &&ub) {
   addUB(std::move(ub.first));
   addGuardableUB(std::move(ub.second));

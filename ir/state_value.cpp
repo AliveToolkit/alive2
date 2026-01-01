@@ -101,7 +101,7 @@ StateValue StateValue::simplify() const {
 }
 
 ostream& operator<<(ostream &os, const StateValue &val) {
-  return os << val.value << " / non-poison= " << val.non_poison;
+  return os << val.value << " / non-poison=" << val.non_poison;
 }
 
 }

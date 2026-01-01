@@ -2217,7 +2217,9 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
   }
 
   expr allocated = precond && nooverflow;
-  state->addPre(nonnull.implies(allocated));
+  state->addPre(nonnull.implies(allocated),
+                // there are no useful undefs when allocating the null block
+                is_local || !has_null_block || bid != 0 );
   allocated |= nonnull;
 
   Pointer p(*this, bid, is_local);
