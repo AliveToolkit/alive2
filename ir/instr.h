@@ -223,6 +223,7 @@ public:
     dup(Function &f, const std::string &suffix) const override;
 };
 
+
 class FpUnaryReductionOp final : public Instr {
 public:
   enum Op {
@@ -256,6 +257,7 @@ public:
   std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
+
 
 class TernaryOp final : public Instr {
 public:
