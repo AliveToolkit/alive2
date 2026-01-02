@@ -652,6 +652,32 @@ void FpBinOp::print(ostream &os) const {
     os << ", exceptions=" << ex;
 }
 
+static expr fmin_fmax(State &s, const expr &a, const expr &b, const expr &rm,
+                      bool min) {
+  expr ndet = s.getFreshNondetVar("maxminnondet", true);
+  expr cmp = min ? a.fole(b) : a.foge(b);
+  return expr::mkIf(a.isNaN(), b,
+                    expr::mkIf(b.isNaN(), a,
+                               expr::mkIf(a.foeq(b),
+                                          expr::mkIf(ndet, a, b),
+                                          expr::mkIf(cmp, a, b))));
+}
+
+static expr fminimum_fmaximum(State &s, const expr &a, const expr &b,
+                              const expr &rm, bool min) {
+  expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
+  expr cmp = min ? a.fole(b) : a.foge(b);
+  expr neg_cond = min ? (a.isFPNegative() || b.isFPNegative())
+                      : (a.isFPNegative() && b.isFPNegative());
+  expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
+                      expr::mkIf(neg_cond, zneg, zpos),
+                      expr::mkIf(cmp, a, b));
+
+  return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+}
+
+
+
 static expr any_fp_zero(State &s, const expr &v) {
   expr is_zero = v.isFPZero();
   if (is_zero.isFalse())
@@ -889,28 +915,14 @@ StateValue FpBinOp::toSMT(State &s) const {
   case FMin:
   case FMax:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
-      expr ndet = s.getFreshNondetVar("maxminnondet", true);
-      expr cmp = op == FMin ? a.fole(b) : a.foge(b);
-      return expr::mkIf(a.isNaN(), b,
-                        expr::mkIf(b.isNaN(), a,
-                                   expr::mkIf(a.foeq(b),
-                                              expr::mkIf(ndet, a, b),
-                                              expr::mkIf(cmp, a, b))));
+      return fmin_fmax(s, a, b, rm, op == FMin);
     };
     break;
 
   case FMinimum:
   case FMaximum:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
-      expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
-      expr cmp = op == FMinimum ? a.fole(b) : a.foge(b);
-      expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
-                                     : (a.isFPNegative() && b.isFPNegative());
-      expr e = expr::mkIf(a.isFPZero() && b.isFPZero(),
-                          expr::mkIf(neg_cond, zneg, zpos),
-                          expr::mkIf(cmp, a, b));
-
-      return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+      return fminimum_fmaximum(s, a, b, rm, op == FMinimum);
     };
     break;
 
@@ -1434,27 +1446,13 @@ StateValue FpUnaryReductionOp::toSMT(State &s) const {
   case FMin:
   case FMax:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
-      expr ndet = s.getFreshNondetVar("maxminnondet", true);
-      expr cmp = op == FMin ? a.fole(b) : a.foge(b);
-
-      return expr::mkIf(a.isNaN(), b,
-                        expr::mkIf(b.isNaN(), a,
-                                   expr::mkIf(a.foeq(b), expr::mkIf(ndet, a, b),
-                                              expr::mkIf(cmp, a, b))));
+      return fmin_fmax(s, a, b, rm, op == FMin);
     };
     break;
   case FMinimum:
   case FMaximum:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
-      expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
-      expr cmp = op == FMinimum ? a.fole(b) : a.foge(b);
-      expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
-                                     : (a.isFPNegative() && b.isFPNegative());
-      expr e =
-          expr::mkIf(a.isFPZero() && b.isFPZero(),
-                     expr::mkIf(neg_cond, zneg, zpos), expr::mkIf(cmp, a, b));
-
-      return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+      return fminimum_fmaximum(s, a, b, rm, op == FMinimum);
     };
     break;
   default:
