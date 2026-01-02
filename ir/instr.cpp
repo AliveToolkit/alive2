@@ -1393,6 +1393,102 @@ UnaryReductionOp::dup(Function &f, const string &suffix) const {
   return make_unique<UnaryReductionOp>(getType(), getName() + suffix, *val, op);
 }
 
+vector<Value *> FpUnaryReductionOp::operands() const {
+  return {val};
+}
+
+bool FpUnaryReductionOp::propagatesPoison() const {
+  return true;
+}
+
+bool FpUnaryReductionOp::hasSideEffects() const {
+  return false;
+}
+
+void FpUnaryReductionOp::rauw(const Value &what, Value &with) {
+  RAUW(val);
+}
+
+void FpUnaryReductionOp::print(ostream &os) const {
+  const char *str = nullptr;
+  switch (op) {
+  case FMin: str = "reduce_fmin "; break;
+  case FMax: str = "reduce_fmax "; break;
+  case FMinimum: str = "reduce_fminimum "; break;
+  case FMaximum: str = "reduce_fmaximum "; break;
+  }
+
+  os << getName() << " = " << str << print_type(val->getType())
+     << val->getName();
+}
+
+StateValue FpUnaryReductionOp::toSMT(State &s) const {
+  auto &v = s[*val];
+  auto vty = val->getType().getAsAggregateType();
+  bool bitwise = false;
+  StateValue res;
+
+  function<expr(const expr &, const expr &, const expr &)> fn;
+
+  switch (op) {
+  case FMin:
+  case FMax:
+    fn = [&](const expr &a, const expr &b, const expr &rm) {
+      expr ndet = s.getFreshNondetVar("maxminnondet", true);
+      expr cmp = op == FMin ? a.fole(b) : a.foge(b);
+
+      return expr::mkIf(a.isNaN(), b,
+                        expr::mkIf(b.isNaN(), a,
+                                   expr::mkIf(a.foeq(b), expr::mkIf(ndet, a, b),
+                                              expr::mkIf(cmp, a, b))));
+    };
+    break;
+  case FMinimum:
+  case FMaximum:
+    fn = [&](const expr &a, const expr &b, const expr &rm) {
+      expr zpos = expr::mkNumber("0", a), zneg = expr::mkNumber("-0", a);
+      expr cmp = op == FMinimum ? a.fole(b) : a.foge(b);
+      expr neg_cond = op == FMinimum ? (a.isFPNegative() || b.isFPNegative())
+                                     : (a.isFPNegative() && b.isFPNegative());
+      expr e =
+          expr::mkIf(a.isFPZero() && b.isFPZero(),
+                     expr::mkIf(neg_cond, zneg, zpos), expr::mkIf(cmp, a, b));
+
+      return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
+    };
+    break;
+  default:
+    UNREACHABLE();
+  }
+
+  auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
+    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison, fn, ty,
+                     fmath, rm, bitwise);
+  };
+
+  for (unsigned i = 0, e = vty->numElementsConst(); i != e; ++i) {
+    auto ith = vty->extract(v, i);
+    if (i == 0) {
+      res = std::move(ith);
+      continue;
+    }
+
+    res = scalar(res, ith, getType());
+  }
+  return res;
+}
+
+expr FpUnaryReductionOp::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+    getType().enforceFloatType() &&
+    val->getType().enforceVectorType(
+        [this](auto &scalar) { return scalar == getType(); });
+}
+
+unique_ptr<Instr>
+FpUnaryReductionOp::dup(Function &f, const string &suffix) const {
+  return make_unique<FpUnaryReductionOp>(getType(), getName() + suffix, *val, op, fmath, rm, ex);
+}
 
 vector<Value*> TernaryOp::operands() const {
   return { a, b, c };

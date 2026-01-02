@@ -1,0 +1,122 @@
+Name: reduce_fmax, constant prop.
+%t0 = insertelement <2 x float> undef, float 1.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fmax <2 x float> %t1
+  =>
+%t = float 3.0
+
+Name: reduce_fmin, constant prop.
+%t0 = insertelement <2 x float> undef, float 1.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fmin <2 x float> %t1
+  =>
+%t = float 1.0
+
+Name: reduce_fmax, lane0 NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float %v,  i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fmax <2 x float> %t1
+  =>
+%t = float 3.0
+
+Name: reduce_fmax, lane1 NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float 3.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float %v,  i8 1
+%t  = reduce_fmax <2 x float> %t1
+  =>
+%t = float 3.0
+
+Name: reduce_fmax, BOTH NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float %v, i8 0
+%t1 = insertelement <2 x float> %t0,  float %v, i8 1
+%t  = reduce_fmax <2 x float> %t1
+  =>
+%v = fdiv float 0.0, 0.0
+%t = float %v
+
+Name: reduce_fmin, lane0 NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float %v,  i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fmin <2 x float> %t1
+  =>
+%t = float 3.0
+
+Name: reduce_fmin, lane1 NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float 3.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float %v,  i8 1
+%t  = reduce_fmin <2 x float> %t1
+  =>
+%t = float 3.0
+
+Name: reduce_fmin, BOTH NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float %v, i8 0
+%t1 = insertelement <2 x float> %t0,  float %v, i8 1
+%t  = reduce_fmin <2 x float> %t1
+  =>
+%v = fdiv float 0.0, 0.0
+%t = float %v
+
+Name: reduce_fmax, nondet (+0,-0) => +0
+%t0 = insertelement <2 x float> undef, float +0.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
+%t  = reduce_fmax <2 x float> %t1
+  =>
+%t = float +0.0
+
+Name: reduce_fmax, nondet (+0,-0) => -0
+%t0 = insertelement <2 x float> undef, float +0.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
+%t  = reduce_fmax <2 x float> %t1
+  =>
+%t = float -0.0
+
+Name: reduce_fmin, nondet (+0,-0) => +0
+%t0 = insertelement <2 x float> undef, float +0.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
+%t  = reduce_fmin <2 x float> %t1
+  =>
+%t = float +0.0
+
+Name: reduce_fmin, nondet (+0,-0) => -0
+%t0 = insertelement <2 x float> undef, float +0.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
+%t  = reduce_fmin <2 x float> %t1
+  =>
+%t = float -0.0
+
+Name: reduce_fmaximum, constant prop.
+%t0 = insertelement <2 x float> undef, float 1.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fmaximum <2 x float> %t1
+  =>
+%t = float 3.0
+
+Name: reduce_fminimum, constant prop.
+%t0 = insertelement <2 x float> undef, float 1.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fminimum <2 x float> %t1
+  =>
+%t = float 1.0
+
+Name: reduce_fmaximum, lane0 NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float %v,  i8 0
+%t1 = insertelement <2 x float> %t0,  float 3.0, i8 1
+%t  = reduce_fmaximum <2 x float> %t1
+  =>
+%t = fdiv float 0.0, 0.0
+
+Name: reduce_fminimum, lane1 NaN
+%v  = fdiv float 0.0, 0.0
+%t0 = insertelement <2 x float> undef, float 3.0, i8 0
+%t1 = insertelement <2 x float> %t0,  float %v,  i8 1
+%t  = reduce_fminimum <2 x float> %t1
+  =>
+%t = fdiv float 0.0, 0.0
+

@@ -267,6 +267,10 @@ space+ {
 "reduce_smin" { return REDUCE_SMIN; }
 "reduce_umax" { return REDUCE_UMAX; }
 "reduce_umin" { return REDUCE_UMIN; }
+"reduce_fmaximum" { return REDUCE_FMAXIMUM; }
+"reduce_fminimum" { return REDUCE_FMINIMUM; }
+"reduce_fmax" { return REDUCE_FMAX; }
+"reduce_fmin" { return REDUCE_FMIN; }
 "fabs" { return FABS; }
 "fadd" { return FADD; }
 "fsub" { return FSUB; }

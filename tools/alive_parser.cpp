@@ -886,6 +886,25 @@ static unique_ptr<Instr> parse_unary_reduction_op(string_view name,
   return make_unique<UnaryReductionOp>(ty, string(name), a, op);
 }
 
+static unique_ptr<Instr> parse_fp_unary_reduction_op(string_view name, token op_token) {
+  FpUnaryReductionOp::Op op;
+  auto fmath = parse_fast_math(op_token);
+  switch (op_token) {
+  case REDUCE_FMAX: op = FpUnaryReductionOp::FMax; break;
+  case REDUCE_FMIN: op = FpUnaryReductionOp::FMin; break;
+  case REDUCE_FMAXIMUM: op = FpUnaryReductionOp::FMaximum; break;
+  case REDUCE_FMINIMUM: op = FpUnaryReductionOp::FMinimum; break;
+  default: UNREACHABLE();
+  }
+
+  auto &op_ty = parse_type();
+  auto &ty =
+      op_ty.isVectorType() ? op_ty.getAsAggregateType()->getChild(0) : op_ty;
+  auto &a = parse_operand(op_ty);
+  return make_unique<FpUnaryReductionOp>(ty, string(name), a, op, fmath,
+                                         FpRoundingMode(), FpExceptionMode());
+}
+
 static unique_ptr<Instr> parse_ternary(string_view name, token op_token) {
   TernaryOp::Op op;
   switch (op_token) {
@@ -1284,6 +1303,11 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case REDUCE_UMAX:
   case REDUCE_UMIN:
     return parse_unary_reduction_op(name, t);
+  case REDUCE_FMAX:
+  case REDUCE_FMIN:
+  case REDUCE_FMAXIMUM:
+  case REDUCE_FMINIMUM:
+    return parse_fp_unary_reduction_op(name, t);
   case FSHL:
   case FSHR:
   case SMULFIX:

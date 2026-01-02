@@ -1,0 +1,8 @@
+Name: t0
+%t0 = insertelement <2 x float> %x, float undef, i8 1
+%r = reduce_fmax <2 x float> %t0
+  =>
+%r = undef
+
+; ERROR: Target's return value is more undefined for float %r
+

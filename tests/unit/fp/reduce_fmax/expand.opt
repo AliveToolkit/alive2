@@ -1,0 +1,15 @@
+Name: t0
+%r = reduce_fmax <2 x float> %x
+  =>
+%v0 = extractelement <2 x float> %x, i8 0
+%v1 = extractelement <2 x float> %x, i8 1
+%r = fmax float %v0, %v1
+
+Name: t1
+%t0 = insertelement <2 x float> undef, float %v0, i8 0
+%t1 = insertelement <2 x float> %t0, float %v1, i8 1
+%r = reduce_fmax <2 x float> %t1
+  =>
+%frozen_v0 = freeze float %v0
+%frozen_v1 = freeze float %v1
+%r = fmax float %frozen_v0, %frozen_v1

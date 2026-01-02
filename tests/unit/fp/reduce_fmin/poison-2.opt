@@ -1,0 +1,12 @@
+Name: t0
+%t0 = insertelement <2 x float> %x, float poison, i8 1
+%r = reduce_fmin <2 x float> %t0
+  =>
+%r = poison
+
+Name: t1
+%t0 = insertelement <2 x float> %x, float poison, i8 1
+%r = reduce_fmin <2 x float> %t0
+  =>
+%r = undef
+
