@@ -1435,11 +1435,6 @@ void FpUnaryReductionOp::print(ostream &os) const {
 }
 
 StateValue FpUnaryReductionOp::toSMT(State &s) const {
-  auto &v = s[*val];
-  auto vty = val->getType().getAsAggregateType();
-  bool bitwise = false;
-  StateValue res;
-
   function<expr(const expr &, const expr &, const expr &)> fn;
 
   switch (op) {
@@ -1459,10 +1454,9 @@ StateValue FpUnaryReductionOp::toSMT(State &s) const {
     UNREACHABLE();
   }
 
-  auto scalar = [&](const auto &a, const auto &b, const Type &ty) {
-    return fm_poison(s, a.value, a.non_poison, b.value, b.non_poison, fn, ty,
-                     fmath, rm, bitwise);
-  };
+  auto &v = s[*val];
+  auto vty = val->getType().getAsAggregateType();
+  StateValue res;
 
   for (unsigned i = 0, e = vty->numElementsConst(); i != e; ++i) {
     auto ith = vty->extract(v, i);
@@ -1470,8 +1464,8 @@ StateValue FpUnaryReductionOp::toSMT(State &s) const {
       res = std::move(ith);
       continue;
     }
-
-    res = scalar(res, ith, getType());
+    res = fm_poison(s, res.value, res.non_poison, ith.value, ith.non_poison, fn,
+                    getType(), fmath, rm, false);
   }
   return res;
 }
