@@ -676,8 +676,6 @@ static expr fminimum_fmaximum(State &s, const expr &a, const expr &b,
   return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
 }
 
-
-
 static expr any_fp_zero(State &s, const expr &v) {
   expr is_zero = v.isFPZero();
   if (is_zero.isFalse())

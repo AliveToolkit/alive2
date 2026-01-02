@@ -3,8 +3,8 @@ declare float @llvm.vector.reduce.fmaximum.v2f32(<2 x float>)
 define float @src_fmaximum(<2 x float> %x) {
   %v0 = extractelement <2 x float> %x, i32 0
   %v1 = extractelement <2 x float> %x, i32 1
-  %cmp = fcmp ogt float %v0, %v1
-  %r = select i1 %cmp, float %v0, float %v1
+  %cmp = fcmp nnan ogt float %v0, %v1
+  %r = select nsz i1 %cmp, float %v0, float %v1
   ret float %r
 }
 

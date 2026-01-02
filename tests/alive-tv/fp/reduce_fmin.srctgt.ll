@@ -4,8 +4,8 @@ define float @src_fmin(<2 x float> %x) {
   %v0 = extractelement <2 x float> %x, i32 0
   %v1 = extractelement <2 x float> %x, i32 1
   ; ordered less-than (false if NaN)
-  %cmp = fcmp olt float %v0, %v1
-  %r = select i1 %cmp, float %v0, float %v1
+  %cmp = fcmp nnan olt float %v0, %v1
+  %r = select nsz i1 %cmp, float %v0, float %v1
   ret float %r
 }
 
