@@ -1087,7 +1087,7 @@ expr State::FnCallOutput::refines(const FnCallOutput &rhs,
   return ret;
 }
 
-StateValue
+State::FnCallResult
 State::addFnCall(const string &name, vector<StateValue> &&inputs,
                  vector<PtrInput> &&ptr_inputs,
                  const Type &out_type, StateValue &&ret_arg,
@@ -1096,7 +1096,8 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
   bool noret   = attrs.has(FnAttrs::NoReturn);
   bool willret = attrs.has(FnAttrs::WillReturn);
   bool noundef = attrs.has(FnAttrs::NoUndef);
-  bool noalias = attrs.has(FnAttrs::NoAlias);
+  bool noalias = (attrs.has(FnAttrs::NoAlias)) || 
+              (attrs.has(AllocKind::Alloc) && !attrs.has(FnAttrs::AllocSize));
   bool is_indirect = name.starts_with("#indirect_call");
 
   expr fn_ptr_bid;
@@ -1284,8 +1285,17 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     addUB(I->second.ub);
     addNoReturn(I->second.noreturns);
     retval = I->second.retval;
+
+    optional<expr> alloc_size;
+    if (noalias && out_type.isPtrType() && !I->second.ret_data.empty()) {
+      alloc_size = I->second.ret_data[0].size;
+    }
+    
     memory.setState(I->second.callstate, memaccess, I->first.args_ptr,
                     inaccessible_bid);
+
+
+    return { std::move(retval), std::move(alloc_size) };
   }
   else {
     // target: this fn call must match one from the source, otherwise it's UB
@@ -1342,15 +1352,23 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
       fn_call_pre &= pre;
       if (qvar.isValid())
         fn_call_qvars.emplace(std::move(qvar));
+
+      // Extract allocation size for noalias functions returning pointers
+      optional<expr> alloc_size;
+      if (noalias && out_type.isPtrType() && !d.ret_data.empty()) {
+        alloc_size = d.ret_data[0].size;
+      }
+
+      analysis.ranges_fn_calls.inc(name, memaccess);
+      return { std::move(retval), std::move(alloc_size) };
     } else {
       addUB(expr(false));
       retval = out_type.getDummyValue(false);
+
+      analysis.ranges_fn_calls.inc(name, memaccess);
+      return { std::move(retval), std::nullopt };
     }
   }
-
-  analysis.ranges_fn_calls.inc(name, memaccess);
-
-  return retval;
 }
 
 void State::doesApproximation(string &&name, optional<expr> e,

@@ -240,6 +240,14 @@ private:
     smt::expr refines(const FnCallOutput &rhs, const Type &retval_ty) const;
     auto operator<=>(const FnCallOutput &rhs) const = default;
   };
+
+  struct FnCallResult {
+    StateValue retval;
+    std::optional<smt::expr> alloc_size;
+  };
+
+  // Add non-deterministic local_blk_size variable member and pending variable to access it
+
   std::map<std::string, std::map<FnCallInput, FnCallOutput>> fn_call_data;
   smt::expr fn_call_pre = true;
   std::set<smt::expr> fn_call_qvars;
@@ -308,7 +316,7 @@ public:
   void addNoReturn(const smt::expr &cond);
   bool isViablePath() const { return domain.UB; }
 
-  StateValue
+  FnCallResult
     addFnCall(const std::string &name, std::vector<StateValue> &&inputs,
               std::vector<PtrInput> &&ptr_inputs,
               const Type &out_type,
