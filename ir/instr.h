@@ -97,6 +97,36 @@ public:
   void print(std::ostream &os) const override;
   StateValue toSMT(State &s) const override;
   smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr> dup(Function &f, 
+                             const std::string &suffix) const override;
+};
+
+class FpIntOp final : public Instr {
+public:
+  enum Op { LdExp };
+
+private:
+  Value *lhs, *rhs;
+  Op op;
+  FpRoundingMode rm;
+  FpExceptionMode ex;
+
+public:
+  FpIntOp(Type &type, std::string &&name, Value &lhs, Value &rhs, Op op,
+          FpRoundingMode rm, FpExceptionMode ex)
+  : Instr(type, std::move(name)), lhs(&lhs), rhs(&rhs), op(op), rm(rm), 
+          ex(ex) {}
+
+  Op getOp() const { return op; }
+  FpRoundingMode getRoundingMode() const { return rm; }
+  FpExceptionMode getExceptionMode() const { return ex; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
   std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
@@ -128,7 +158,6 @@ public:
   std::unique_ptr<Instr>
     dup(Function &f, const std::string &suffix) const override;
 };
-
 
 class FpUnaryOp final : public Instr {
 public:
