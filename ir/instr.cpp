@@ -2682,19 +2682,19 @@ StateValue FnCall::toSMT(State &s) const {
   };
 
   if (attrs.has(AllocKind::Alloc) ||
-      attrs.has(AllocKind::Realloc)) {
+      attrs.has(AllocKind::Realloc) ||
+      attrs.has(FnAttrs::AllocSize)) {
 
     smt::expr size;
     smt::expr np_size;
 
     if (!attrs.has(FnAttrs::AllocSize)) {
-      has_write_fncall |= true;
       static IntType sizet_type(string("size_t"), config::max_sizet_bits);
       auto result = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
                          std::move(ptr_inputs), sizet_type, StateValue{},
                          nullptr, std::vector<StateValue>{}, attrs, indirect_hash);
       size = std::move(result.value);
-      np_size = expr(true);
+      np_size = std::move(result.non_poison);
     } else {
       auto result = attrs.computeAllocSize(s, args);
       size = std::move(result.first);
