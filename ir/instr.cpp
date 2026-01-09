@@ -3523,8 +3523,16 @@ StateValue Return::toSMT(State &s) const {
     if (!arg.getType().isPtrType())
       continue;
     auto &attrs = static_cast<const Input&>(arg).getAttributes();
-    if (attrs.has(ParamAttrs::DeadOnReturn))
-      m.memset(s[arg].value, poison, {}, bits_byte / 8, {}, false, true);
+    if (attrs.has(ParamAttrs::DeadOnReturn)) {
+      if (attrs.deadOnReturnBytes.has_value()) {
+        // Poison the first specified bytes of memory.
+        auto bytesize = expr::mkUInt(*attrs.deadOnReturnBytes, bits_size_t);
+        m.memset(s[arg].value, poison, bytesize, bits_byte / 8, {}, false, false);
+      } else {
+        // Poison the whole block.
+        m.memset(s[arg].value, poison, {}, bits_byte / 8, {}, false, true);
+      }
+    }
   }
 
   vector<pair<Value*, ParamAttrs>> args;
