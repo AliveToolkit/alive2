@@ -81,6 +81,7 @@ public:
   uint64_t blockSize = 0;        // exact block size for e.g. byval args
   uint64_t align = 1;
   uint16_t nofpclass = 0;
+  std::optional<uint64_t> deadOnReturnBytes; // bytes for dead_on_return, if exist
 
   std::vector<std::pair<uint64_t, uint64_t>> initializes;
 
