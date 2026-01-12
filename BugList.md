@@ -105,7 +105,7 @@ Please contact us or submit a PR if something is missing or inaccurate.
 98. InstCombine: formation of fmax ignores SNaN (https://llvm.org/PR138303)
 99. InstSimplify: incorrect frexp(frexp(x)) -> frexp(x) fold (https://llvm.org/PR138819)
 100. Incorrect lowering of objectsize introduces UB (https://llvm.org/PR156435)
-
+101. Miscompile of FindFirstIV pattern due to truncation (https://llvm.org/PR173459)
 
 ### Bugs found in Z3
 1. Incorrect bitblast for fprem (https://github.com/Z3Prover/z3/issues/2369)
