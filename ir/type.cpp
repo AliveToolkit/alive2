@@ -6,6 +6,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <cassert>
 #include <numeric>
@@ -1089,12 +1090,19 @@ void ArrayType::print(ostream &os) const {
 }
 
 
-VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(std::move(name), false) {
-  assert(elements != 0);
-  this->elements = elements;
+expr VectorType::vscale() const {
+  return defined ? expr::mkUInt(vscale_value, var_vector_elements) :
+                   var("vscale", var_vector_elements);
+}
+
+VectorType::VectorType(string &&name, unsigned elems, Type &elTy, bool scal)
+  : AggregateType(std::move(name), false), scalable(scal), min_elements(elems) {
+  assert(elems != 0);
+  if (scalable)
+    elems *= util::config::vscale_value;
+  this->elements = elems;
   defined = true;
-  children.resize(elements, &elementTy);
+  children.resize(elements, &elTy);
   is_padding.resize(elements, false);
 }
 
@@ -1172,14 +1180,25 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
+void VectorType::fixup(const Model &m) {
+  if (!defined)
+    vscale_value = m.getUInt(vscale());
+  AggregateType::fixup(m);
+}
+
 expr VectorType::enforceVectorType(
     const function<expr(const Type&)> &enforceElem) const {
   return enforceElem(*children[0]);
 }
 
 void VectorType::print(ostream &os) const {
-  if (elements)
-    os << '<' << elements << " x " << *children[0] << '>';
+  if (!elements)
+    return;
+  os << '<';
+  if (scalable) {
+    os << "vscale" << ":" << util::config::vscale_value << " x ";
+  }
+  os << min_elements << " x " << *children[0] << '>';
 }
 
 
