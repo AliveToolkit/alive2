@@ -211,6 +211,16 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
     return make_unique<Assume>(*make_intconst(0, 1), Assume::AndNonPoison);
   }
 
+  void addNoundefAssumes(const llvm::CallBase &i,
+                         std::initializer_list<Value*> args) {
+    unsigned idx = 0;
+    for (auto *arg : args) {
+      if (i.paramHasAttr(idx, llvm::Attribute::NoUndef))
+        BB->addInstr(make_unique<Assume>(*arg, Assume::WellDefined));
+      ++idx;
+    }
+  }
+
 public:
   llvm2alive_(llvm::Function &f, const llvm::TargetLibraryInfo &TLI, bool IsSrc,
               const vector<GlobalVariable*> &gvsInSrc)
@@ -807,6 +817,7 @@ public:
         }
       }
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       return make_unique<Assume>(*val, Assume::AndNonPoison);
     }
     case llvm::Intrinsic::sadd_with_overflow:
@@ -831,6 +842,7 @@ public:
     case llvm::Intrinsic::ucmp:
     case llvm::Intrinsic::scmp: {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       BinOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::sadd_with_overflow: op=BinOp::SAdd_Overflow; break;
@@ -867,6 +879,7 @@ public:
     case llvm::Intrinsic::expect_with_probability:
     case llvm::Intrinsic::is_constant: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       UnaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::bitreverse:  op = UnaryOp::BitReverse; break;
@@ -892,6 +905,7 @@ public:
     case llvm::Intrinsic::vector_reduce_umax:
     case llvm::Intrinsic::vector_reduce_umin: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       UnaryReductionOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::vector_reduce_add: op = UnaryReductionOp::Add; break;
@@ -912,8 +926,9 @@ public:
     case llvm::Intrinsic::vector_reduce_fmax:
     case llvm::Intrinsic::vector_reduce_fminimum:
     case llvm::Intrinsic::vector_reduce_fmaximum: {
-    PARSE_UNOP();
-    FpUnaryReductionOp::Op op;
+      PARSE_UNOP();
+      addNoundefAssumes(i, {val});
+      FpUnaryReductionOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::vector_reduce_fmin:     op = FpUnaryReductionOp::FMin; break;
       case llvm::Intrinsic::vector_reduce_fmax:     op = FpUnaryReductionOp::FMax; break;
@@ -935,6 +950,7 @@ public:
     case llvm::Intrinsic::objectsize:
     {
       PARSE_TRIOP();
+      addNoundefAssumes(i, {a, b, c});
       TernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fshl:         op = TernaryOp::FShl; break;
@@ -955,6 +971,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_fmuladd:
     {
       PARSE_TRIOP();
+      addNoundefAssumes(i, {a, b, c});
       FpTernaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::fma:
@@ -985,6 +1002,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_maximum:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       FpBinOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::copysign:                         op = FpBinOp::CopySign; break;
@@ -1028,6 +1046,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_trunc:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       FpUnaryOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::canonicalize:                       op = FpUnaryOp::Canonicalize; break;
@@ -1057,6 +1076,7 @@ public:
     case llvm::Intrinsic::frexp:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       FpUnaryOpVerticalZip::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::frexp: op = FpUnaryOpVerticalZip::FrExp; break;
@@ -1084,6 +1104,7 @@ public:
     case llvm::Intrinsic::fptosi_sat:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       FpConversionOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::experimental_constrained_sitofp:  op = FpConversionOp::SIntToFP; break;
@@ -1114,6 +1135,7 @@ public:
     case llvm::Intrinsic::experimental_constrained_fcmps:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       auto *fcmp = cast<llvm::ConstrainedFPCmpIntrinsic>(&i);
       auto cond = parse_fcmp_cond(fcmp->getPredicate());
       ret = make_unique<FCmp>(*ty, value_name(i), cond, *a, *b, FastMathFlags(),
@@ -1123,6 +1145,7 @@ public:
     case llvm::Intrinsic::is_fpclass:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       TestOp::Op op;
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::is_fpclass: op = TestOp::Is_FPClass; break;
@@ -1135,6 +1158,7 @@ public:
     case llvm::Intrinsic::lifetime_end:
     {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       if (isa<llvm::PoisonValue>(i.getOperand(1)))
         return NOP(i);
       if (i.getIntrinsicID() == llvm::Intrinsic::lifetime_end)
@@ -1166,6 +1190,7 @@ public:
     case llvm::Intrinsic::ptrmask:
     {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       ret = make_unique<PtrMask>(*ty, value_name(i), *a, *b);
       break;
     }
@@ -1187,14 +1212,17 @@ public:
     }
     case llvm::Intrinsic::vastart: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       return make_unique<VaStart>(*val);
     }
     case llvm::Intrinsic::vaend: {
       PARSE_UNOP();
+      addNoundefAssumes(i, {val});
       return make_unique<VaEnd>(*val);
     }
     case llvm::Intrinsic::vacopy: {
       PARSE_BINOP();
+      addNoundefAssumes(i, {a, b});
       return make_unique<VaCopy>(*a, *b);
     }
 
@@ -1216,6 +1244,7 @@ public:
 #undef PROCESS
       {
         PARSE_BINOP();
+        addNoundefAssumes(i, {a, b});
         X86IntrinBinOp::Op op;
         switch (i.getIntrinsicID()) {
 #define PROCESS(NAME, A, B, C, D, E, F)                                        \
@@ -1235,6 +1264,7 @@ public:
 #undef PROCESS
       {
         PARSE_TRIOP();
+        addNoundefAssumes(i, {a, b, c});
         X86IntrinTerOp::Op op;
         switch (i.getIntrinsicID()) {
 #define PROCESS(NAME, A, B, C, D, E, F, G, H)                                  \
@@ -1254,6 +1284,7 @@ public:
 #undef PROCESS
       {
         PARSE_QUADOP();
+        addNoundefAssumes(i, {a, b, c, d});
         X86IntrinQuadOp::Op op;
         switch (i.getIntrinsicID()) {
 #define PROCESS(NAME)                                                          \
