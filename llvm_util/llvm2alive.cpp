@@ -212,7 +212,7 @@ class llvm2alive_ : public llvm::InstVisitor<llvm2alive_, unique_ptr<Instr>> {
   }
 
   void addNoundefAssumes(const llvm::CallBase &i,
-                         std::initializer_list<Value*> args) {
+                         const std::initializer_list<Value *> &args) {
     unsigned idx = 0;
     for (auto *arg : args) {
       if (i.paramHasAttr(idx, llvm::Attribute::NoUndef))
