@@ -817,7 +817,6 @@ public:
         }
       }
       PARSE_UNOP();
-      addNoundefAssumes(i, {val});
       return make_unique<Assume>(*val, Assume::AndNonPoison);
     }
     case llvm::Intrinsic::sadd_with_overflow:
