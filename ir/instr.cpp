@@ -696,35 +696,31 @@ static expr any_fp_zero(State &s, const expr &v) {
   return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
-static expr handle_subnormal(const State &s, FPDenormalAttrs::Type attr,
-                             expr &&v) {
-  auto posz = [&]() {
-    return expr::mkIf(v.isFPSubNormal(), expr::mkNumber("0", v), v);
-  };
-  auto sign = [&]() {
-    return expr::mkIf(v.isFPSubNormal(),
-                      expr::mkIf(v.isFPNegative(),
-                                 expr::mkNumber("-0", v),
-                                 expr::mkNumber("0", v)),
-                      v);
-  };
+static expr handle_subnormal(State &s, FPDenormalAttrs::Type attr, expr &&v) {
+  auto nondet = [&]() { return s.getFreshNondetVar("subnormal", true); };
+  expr subnormal = v.isFPSubNormal();
 
   switch (attr) {
   case FPDenormalAttrs::IEEE:
     break;
   case FPDenormalAttrs::PositiveZero:
-    v = posz();
+    v = expr::mkIf(subnormal && nondet(), expr::mkNumber("0", v), v);
     break;
   case FPDenormalAttrs::PreserveSign:
-    v = sign();
+    v = expr::mkIf(subnormal && nondet(),
+                   expr::mkIf(v.isFPNegative(),
+                              expr::mkNumber("-0", v),
+                              expr::mkNumber("0", v)),
+                   v);
     break;
   case FPDenormalAttrs::Dynamic: {
     auto &mode = s.getFpDenormalMode();
-    v = expr::mkIf(mode == FPDenormalAttrs::IEEE,
+    v = expr::mkIf(mode == FPDenormalAttrs::IEEE || nondet() || !subnormal,
                    v,
-                   expr::mkIf(mode == FPDenormalAttrs::PositiveZero,
-                              posz(),
-                              sign()));
+                   expr::mkIf(mode == FPDenormalAttrs::PreserveSign &&
+                                v.isFPNegative(),
+                              expr::mkNumber("-0", v),
+                              expr::mkNumber("0", v)));
     break;
   }
   }
