@@ -1163,9 +1163,6 @@ static void calculateAndInitConstants(Transform &t) {
               inaccessiblememonly_fns.emplace(call->getName()).second)
             ++num_inaccessiblememonly_fns;
         }
-        if(attrs.isAllocWithoutSize()) {
-          has_write_fncall |= attrs.mem.canWriteSomething();
-        }
         if (call->isIndirect()) {
           has_indirect_fncalls = true;
           num_inaccessiblememonly_fns += is_src;
