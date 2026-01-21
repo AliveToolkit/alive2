@@ -2205,8 +2205,23 @@ StateValue Select::toSMT(State &s) const {
   auto &av = s[*a];
   auto &bv = s[*b];
 
-  auto scalar
-    = [&](const auto &a, const auto &b, const auto &c, const Type &ty) {
+  function<StateValue(const StateValue&, const StateValue&, const StateValue&,
+                      const Type&, const Type&)> rec
+    = [&](auto &a, auto &b, auto &c, auto &ty, auto &cond_ty) -> StateValue {
+    if (auto agg = ty.getAsAggregateType()) {
+      vector<StateValue> vals;
+      auto cond_agg = cond_ty.getAsAggregateType();
+
+      for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
+        if (!agg->isPadding(i))
+          vals.emplace_back(rec(agg->extract(a, i), agg->extract(b, i),
+                                cond_agg ? cond_agg->extract(c, i) : c,
+                                agg->getChild(i),
+                                cond_agg ? cond_agg->getChild(i) : cond_ty));
+      }
+      return agg->aggregateVals(vals);
+    }
+
     auto cond = c.value == 1;
     auto identity = [](const expr &x, auto &rm) { return x; };
     return fm_poison(s, expr::mkIf(cond, a.value, b.value),
@@ -2214,20 +2229,7 @@ StateValue Select::toSMT(State &s) const {
                        expr::mkIf(cond, a.non_poison, b.non_poison),
                      identity, ty, fmath, {}, true, /*flags_out_only=*/true);
   };
-
-  if (auto agg = getType().getAsAggregateType()) {
-    vector<StateValue> vals;
-    auto cond_agg = cond->getType().getAsAggregateType();
-
-    for (unsigned i = 0, e = agg->numElementsConst(); i != e; ++i) {
-      if (!agg->isPadding(i))
-        vals.emplace_back(scalar(agg->extract(av, i), agg->extract(bv, i),
-                                 cond_agg ? cond_agg->extract(cv, i) : cv,
-                                 agg->getChild(i)));
-    }
-    return agg->aggregateVals(vals);
-  }
-  return scalar(av, bv, cv, getType());
+  return rec(av, bv, cv, getType(), cond->getType());
 }
 
 expr Select::getTypeConstraints(const Function &f) const {
