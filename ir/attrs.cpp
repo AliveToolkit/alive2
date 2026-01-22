@@ -58,8 +58,8 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
   if (attr.has(ParamAttrs::DeadOnReturn)) {
     os << "dead_on_return";
     if (attr.deadOnReturnBytes.has_value())
-      os << "(" << *attr.deadOnReturnBytes << ")";
-    os << " ";
+      os << '(' << *attr.deadOnReturnBytes << ')';
+    os << ' ';
   }
   if (attr.has(ParamAttrs::Writable))
     os << "writable ";
