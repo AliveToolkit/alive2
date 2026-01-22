@@ -1668,9 +1668,13 @@ public:
         attrs.set(ParamAttrs::DeadOnUnwind);
         break;
 
-      case llvm::Attribute::DeadOnReturn:
+      case llvm::Attribute::DeadOnReturn: {
         attrs.set(ParamAttrs::DeadOnReturn);
+        const auto &info = llvmattr.getDeadOnReturnInfo();
+        if (!info.coversAllReachableMemory())
+          attrs.deadOnReturnBytes = info.getNumberOfDeadBytes();
         break;
+      }
 
       case llvm::Attribute::Initializes:
         for (auto &CR : llvmattr.getInitializes()) {
