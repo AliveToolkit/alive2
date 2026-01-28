@@ -2481,7 +2481,7 @@ MemInstr::ByteAccessInfo FnCall::getByteAccessInfo() const {
 
   // calloc style
   if (attrs.has(AllocKind::Zeroed)) {
-    auto info = ByteAccessInfo::intOnly(1);
+    auto info = ByteAccessInfo::intStore(1);
     auto [alloc, align] = getMaxAllocSize();
     if (alloc)
       info.byteSize = gcd(alloc, align);
@@ -3879,10 +3879,18 @@ bool MemInstr::hasSideEffects() const {
   return true;
 }
 
-MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::intOnly(unsigned bytesz) {
+MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::intLoad(unsigned bytesz) {
   ByteAccessInfo info;
   info.byteSize = bytesz;
-  info.hasIntByteAccess = true;
+  info.doesIntLoad = true;
+  info.observesAddresses = true;
+  return info;
+}
+
+MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::intStore(unsigned bytesz) {
+  ByteAccessInfo info;
+  info.byteSize = bytesz;
+  info.doesIntStore = true;
   return info;
 }
 
@@ -3896,17 +3904,14 @@ MemInstr::ByteAccessInfo
 MemInstr::ByteAccessInfo::get(const Type &t, bool store, unsigned align) {
   bool ptr_access = hasPtr(t);
   ByteAccessInfo info;
-  info.hasIntByteAccess = t.enforcePtrOrVectorType().isFalse();
-  info.doesIntStore     = !ptr_access & store;
-  info.doesPtrStore     = ptr_access && store;
-  info.doesPtrLoad      = ptr_access && !store;
-  info.byteSize         = gcd(align, getCommonAccessSize(t));
-  info.subByteAccess    = t.maxSubBitAccess();
+  info.doesIntLoad   = !ptr_access && !store;
+  info.doesIntStore  = !ptr_access && store;
+  info.doesPtrLoad   = ptr_access && !store;
+  info.doesPtrStore  = ptr_access && store;
+  info.byteSize      = gcd(align, getCommonAccessSize(t));
+  info.subByteAccess = t.maxSubBitAccess();
+  info.observesAddresses = info.doesIntLoad;
   return info;
-}
-
-MemInstr::ByteAccessInfo MemInstr::ByteAccessInfo::full(unsigned byteSize) {
-  return { true, true, true, true, true, byteSize, 0 };
 }
 
 
@@ -4445,9 +4450,7 @@ MemInstr::ByteAccessInfo Memset::getByteAccessInfo() const {
   unsigned byteSize = 1;
   if (auto bs = getInt(*bytes))
     byteSize = gcd(align, *bs);
-  auto info = ByteAccessInfo::intOnly(byteSize);
-  info.doesIntStore = true;
-  return info;
+  return ByteAccessInfo::intStore(byteSize);
 }
 
 vector<Value*> Memset::operands() const {
@@ -4521,7 +4524,7 @@ MemInstr::ByteAccessInfo MemsetPattern::getByteAccessInfo() const {
   unsigned byteSize = 1;
   if (auto bs = getInt(*bytes))
     byteSize = *bs;
-  return ByteAccessInfo::intOnly(byteSize);
+  return ByteAccessInfo::intStore(byteSize);
 }
 
 vector<Value*> MemsetPattern::operands() const {
@@ -4573,7 +4576,7 @@ uint64_t FillPoison::getMaxAccessSize() const {
 }
 
 MemInstr::ByteAccessInfo FillPoison::getByteAccessInfo() const {
-  return ByteAccessInfo::intOnly(1);
+  return ByteAccessInfo::anyType(1);
 }
 
 vector<Value*> FillPoison::operands() const {
@@ -4623,9 +4626,7 @@ MemInstr::ByteAccessInfo Memcpy::getByteAccessInfo() const {
   // FIXME: memcpy doesn't have multi-byte support
   // Memcpy does not have sub-byte access, unless the sub-byte type appears
   // at other instructions
-  auto info = ByteAccessInfo::full(1);
-  info.observesAddresses = false;
-  return info;
+  return { false, false, false, false, false, 1, 0 };
 }
 
 vector<Value*> Memcpy::operands() const {
@@ -4703,9 +4704,7 @@ uint64_t Memcmp::getMaxAccessSize() const {
 }
 
 MemInstr::ByteAccessInfo Memcmp::getByteAccessInfo() const {
-  auto info = ByteAccessInfo::anyType(1);
-  info.observesAddresses = true;
-  return info;
+  return ByteAccessInfo::intLoad(1);
 }
 
 vector<Value*> Memcmp::operands() const {
@@ -4809,7 +4808,7 @@ uint64_t Strlen::getMaxAccessSize() const {
 }
 
 MemInstr::ByteAccessInfo Strlen::getByteAccessInfo() const {
-  return ByteAccessInfo::intOnly(1); /* strlen raises UB on ptr bytes */
+  return ByteAccessInfo::intLoad(1);
 }
 
 vector<Value*> Strlen::operands() const {

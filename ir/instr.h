@@ -729,7 +729,7 @@ public:
   virtual uint64_t getMaxGEPOffset() const = 0;
 
   struct ByteAccessInfo {
-    bool hasIntByteAccess = false;
+    bool doesIntLoad = false;
     bool doesIntStore = false;
     bool doesPtrLoad = false;
     bool doesPtrStore = false;
@@ -744,10 +744,10 @@ public:
 
     bool doesMemAccess() const { return byteSize; }
 
-    static ByteAccessInfo intOnly(unsigned byteSize);
+    static ByteAccessInfo intLoad(unsigned byteSize);
+    static ByteAccessInfo intStore(unsigned byteSize);
     static ByteAccessInfo anyType(unsigned byteSize);
     static ByteAccessInfo get(const Type &t, bool store, unsigned align);
-    static ByteAccessInfo full(unsigned byteSize);
   };
 
   virtual ByteAccessInfo getByteAccessInfo() const = 0;

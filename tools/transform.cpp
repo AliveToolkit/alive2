@@ -1059,12 +1059,11 @@ static void calculateAndInitConstants(Transform &t) {
   has_fncall       = false;
   has_write_fncall = false;
   has_null_block   = false;
+  does_int_load    = false;
   does_int_store   = false;
+  does_ptr_load    = false;
   does_ptr_store   = false;
-  does_ptr_mem_access = false;
-  does_int_mem_access = false;
   observes_addresses  = false;
-  bool does_any_byte_access = false;
   has_indirect_fncalls = false;
   has_ptr_arg = false;
   has_initializes_attr = false;
@@ -1079,7 +1078,6 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t loc_tgt_alloc_aligned_size = 0;
   unsigned min_vect_elem_sz = 0;
   bool does_mem_access = false;
-  bool has_ptr_load = false;
 
   auto update_min_vect_sz = [&](const Type &ty) {
     auto elemsz = minVectorElemSize(ty);
@@ -1181,26 +1179,20 @@ static void calculateAndInitConstants(Transform &t) {
         cur_max_gep      = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
 
         auto info = mi->getByteAccessInfo();
+        does_int_load        |= info.doesIntLoad;
         does_int_store       |= info.doesIntStore;
-        has_ptr_load         |= info.doesPtrLoad;
+        does_ptr_load        |= info.doesPtrLoad;
         does_ptr_store       |= info.doesPtrStore;
-        does_int_mem_access  |= info.hasIntByteAccess;
         does_mem_access      |= info.doesMemAccess();
         observes_addresses   |= info.observesAddresses;
         min_access_size       = gcd(min_access_size, info.byteSize);
         num_sub_byte_bits     = max(num_sub_byte_bits,
                                     (unsigned)bit_width(info.subByteAccess));
-        if (info.doesMemAccess() && !info.hasIntByteAccess &&
-            !info.doesPtrLoad && !info.doesPtrStore)
-          does_any_byte_access = true;
-
         has_alloca |= dynamic_cast<const Alloc*>(&i) != nullptr;
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
                  isCast(ConversionOp::Ptr2Int, i) ||
                  isCast(ConversionOp::Ptr2Addr, i)) {
-        max_alloc_size = max_access_size = cur_max_gep = loc_alloc_aligned_size
-          = UINT64_MAX;
         has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
         has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
         observes_addresses = true;
@@ -1224,11 +1216,6 @@ static void calculateAndInitConstants(Transform &t) {
     num_nonlocals_inst_src = df.getResult().num_nonlocals;
   }
 
-  does_ptr_mem_access = has_ptr_load || does_ptr_store;
-  if (does_any_byte_access && !does_int_mem_access && !does_ptr_mem_access)
-    // Use int bytes only
-    does_int_mem_access = true;
-
   unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
   for (auto glbs : { &globals_src, &globals_tgt }) {
@@ -1244,7 +1231,7 @@ static void calculateAndInitConstants(Transform &t) {
   // check if null block is needed
   // Global variables cannot be null pointers
   has_null_block = num_null_ptrinputs > 0 || has_null_pointer ||
-                  has_ptr_load || has_fncall || has_int2ptr;
+                   does_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
                       num_inaccessiblememonly_fns + has_null_block;
@@ -1256,19 +1243,19 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
-  observes_addresses |= does_int_mem_access /* ptr -> int load punning */;
-
   // condition can happen with ptr2int(poison) or e.g., load poison
   if ((has_ptr2int || does_mem_access) && num_nonlocals == 0) {
     ++num_nonlocals_src;
     ++num_nonlocals;
   }
 
-  if (!does_int_mem_access && !does_ptr_mem_access && has_fncall)
-    does_int_mem_access = true;
+  // ensure bytes contain something
+  if (does_mem_access && !does_int_load && !does_ptr_load && !does_ptr_store)
+    does_int_store = true;
 
-  if (does_int_mem_access && t.tgt.has(FnAttrs::Asm))
-    does_ptr_mem_access = true;
+  // account for ptr <-> int implicit conversions through memory
+  if (observes_addresses)
+    glb_alloc_aligned_size = max_alloc_size = max_access_size = UINT64_MAX;
 
   auto has_attr = [&](ParamAttrs::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {
@@ -1298,10 +1285,6 @@ static void calculateAndInitConstants(Transform &t) {
   // ceil(log2(maxblks)) + 1 for local bit
   bits_for_bid = max(1u, ilog2_ceil(max(num_locals, num_nonlocals), false))
                    + (num_locals && num_nonlocals);
-
-  // account for ptr <-> int implicit conversions through memory
-  if (does_int_mem_access)
-    glb_alloc_aligned_size = max_alloc_size = max_access_size = UINT64_MAX;
 
   // reserve a multiple of 4 for the number of offset bits to make SMT &
   // counterexamples more readable
@@ -1376,8 +1359,6 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nhas_null_block: " << has_null_block
                   << "\ndoes_ptr_store: " << does_ptr_store
                   << "\ndoes_mem_access: " << does_mem_access
-                  << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
-                  << "\ndoes_int_mem_access: " << does_int_mem_access
                   << "\nnum_sub_byte_bits: " << num_sub_byte_bits
                   << "\nhas_ptr_arg: " << has_ptr_arg
                   << '\n';

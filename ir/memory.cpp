@@ -145,12 +145,20 @@ static unsigned sub_byte_bits() {
   return num_sub_byte_bits + size_byte_number();
 }
 
+static bool does_int_mem_access() {
+  return does_int_load || does_int_store;
+}
+
+static bool does_ptr_mem_access() {
+  return does_ptr_load || does_ptr_store;
+}
+
 static bool byte_has_ptr_bit() {
-  return does_int_mem_access && does_ptr_mem_access;
+  return does_int_mem_access() && does_ptr_mem_access();
 }
 
 static unsigned bits_ptr_byte_offset() {
-  assert(!does_ptr_mem_access || bits_byte <= bits_program_pointer);
+  assert(!does_int_mem_access() || bits_byte <= bits_program_pointer);
   return bits_byte < bits_program_pointer ? 3 : 0;
 }
 
@@ -237,7 +245,7 @@ Byte::Byte(const Memory &m, const StateValue &ptr, unsigned i) : m(m) {
   assert(bits_program_pointer <= 64 && bits_program_pointer % 8 == 0);
   assert(i == 0 || bits_ptr_byte_offset() > 0);
 
-  if (!does_ptr_mem_access) {
+  if (!does_ptr_mem_access()) {
     p = expr::mkUInt(0, bitsByte());
     return;
   }
@@ -261,7 +269,7 @@ Byte::Byte(const Memory &m, const StateValue &v, unsigned bits_read,
   assert(!v.isValid() || v.non_poison.isBool() ||
          v.non_poison.bits() == bits_poison_per_byte);
 
-  if (!does_int_mem_access) {
+  if (!does_int_mem_access()) {
     p = expr::mkUInt(0, bitsByte());
     return;
   }
@@ -295,7 +303,7 @@ Byte Byte::mkPoisonByte(const Memory &m) {
 
 expr Byte::isPtr() const {
   if (!byte_has_ptr_bit())
-    return does_ptr_mem_access;
+    return does_ptr_mem_access();
   return p.sign() == 1;
 }
 
@@ -309,7 +317,7 @@ Pointer Byte::ptr() const {
 }
 
 expr Byte::ptrValue() const {
-  if (!does_ptr_mem_access)
+  if (!does_ptr_mem_access())
     return expr::mkUInt(0, Pointer::totalBits());
 
   auto start = bits_ptr_byte_offset() + padding_ptr_byte();
@@ -317,7 +325,7 @@ expr Byte::ptrValue() const {
 }
 
 expr Byte::ptrByteoffset() const {
-  if (!does_ptr_mem_access)
+  if (!does_ptr_mem_access())
     return expr::mkUInt(0, bits_ptr_byte_offset());
   if (bits_ptr_byte_offset() == 0)
     return expr::mkUInt(0, 1);
@@ -327,7 +335,7 @@ expr Byte::ptrByteoffset() const {
 }
 
 expr Byte::nonptrNonpoison() const {
-  if (!does_int_mem_access)
+  if (!does_int_mem_access())
     return expr::mkUInt(0, 1);
   if (isAsmMode())
     return expr::mkInt(-1, bits_poison_per_byte);
@@ -342,7 +350,7 @@ expr Byte::boolNonptrNonpoison() const {
 }
 
 expr Byte::nonptrValue() const {
-  if (!does_int_mem_access)
+  if (!does_int_mem_access())
     return expr::mkUInt(0, bits_byte);
   unsigned start = padding_nonptr_byte() + sub_byte_bits();
   return p.extract(start + bits_byte - 1, start);
@@ -359,8 +367,8 @@ expr Byte::byteNumber() const {
 }
 
 expr Byte::isPoison() const {
-  if (!does_int_mem_access)
-    return does_ptr_mem_access ? !ptrNonpoison() : true;
+  if (!does_int_mem_access())
+    return does_ptr_mem_access() ? !ptrNonpoison() : true;
   if (isAsmMode())
     return false;
 
@@ -375,7 +383,7 @@ expr Byte::isPoison() const {
 expr Byte::nonPoison() const {
   if (isAsmMode())
     return expr::mkInt(-1, bits_poison_per_byte);
-  if (!does_int_mem_access)
+  if (!does_int_mem_access())
     return ptrNonpoison();
 
   expr np = nonptrNonpoison();
@@ -430,7 +438,7 @@ expr TypedByte::nonPoison() const {
   case DATA_ANY:  return byte.nonPoison();
   case DATA_PTR:  {
     auto np = ptrNonpoison();
-    if (!does_int_mem_access)
+    if (!does_int_mem_access())
       return np;
 
     auto zero = expr::mkUInt(0, bits_poison_per_byte);
@@ -468,7 +476,7 @@ expr TypedByte::refined(const TypedByte &other) const {
        (numStoredBits() == other.numStoredBits() &&
         byteNumber() == other.byteNumber()));
 
-  if (does_int_mem_access) {
+  if (does_int_store) {
     if (bits_poison_per_byte == bits_byte) {
       int_cnstr &= (np2 & np1) == np1 && (v1 & np1) == (v2 & np1);
     }
@@ -493,10 +501,8 @@ expr TypedByte::refined(const TypedByte &other) const {
 
   // fast path: if we didn't do any ptr store, then all ptrs in memory were
   // already there and don't need checking
-  if (!does_ptr_store ||
-      is_ptr.isFalse() ||
-      (!does_int_mem_access && is_ptr2.isFalse())) {
-    ptr_cnstr = byte == other.byte;
+  if (!does_ptr_store || is_ptr.isFalse()) {
+    ptr_cnstr = true;
   } else if (!does_int_store) {
     ptr_cnstr = ptrNonpoison().implies(
                   other.ptrNonpoison() &&
@@ -525,9 +531,9 @@ expr TypedByte::refined(const TypedByte &other) const {
 }
 
 unsigned Byte::bitsByte() {
-  unsigned ptr_bits = does_ptr_mem_access *
+  unsigned ptr_bits = does_ptr_mem_access() *
                         (1 + Pointer::totalBits() + bits_ptr_byte_offset());
-  unsigned int_bits = does_int_mem_access * (bits_byte + bits_poison_per_byte)
+  unsigned int_bits = does_int_mem_access() * (bits_byte + bits_poison_per_byte)
                         + sub_byte_bits();
   // allow at least 1 bit if there's no memory access
   return max(1u, byte_has_ptr_bit() + max(ptr_bits, int_bits));
@@ -754,7 +760,7 @@ static StateValue bytesToValue(const Memory &m, const vector<TypedByte> &bytes,
       auto np = ibyteTy.combine_poison(expr_np, b.nonptrNonpoison());
       if (is_asm) {
         np = expr::mkInt(-1, np);
-      } else if (does_ptr_mem_access) {
+      } else if (does_ptr_mem_access()) {
         expr np_ptr = expr::mkIf(b.ptrNonpoison() && (bitsize % 8) == 0,
                                  expr::mkInt(-1, np), expr::mkUInt(0, np));
         np = expr::mkIf(b.isPtr(), np_ptr, np);
@@ -1507,11 +1513,11 @@ void Memory::mkNonlocalValAxioms(const expr &block) const {
 
   // Users may request the initial memory to be non-poisonous
   if ((config::disable_poison_input && state->isSource()) &&
-      (does_int_mem_access || does_ptr_mem_access)) {
+      (does_int_mem_access() || does_ptr_mem_access())) {
     state->addAxiom(expr::mkForAll(1, &offset, &name, !byte.isPoison()));
   }
 
-  if (!does_ptr_mem_access && !(num_sub_byte_bits && config::tgt_is_asm))
+  if (!does_ptr_mem_access() && !(num_sub_byte_bits && config::tgt_is_asm))
     return;
 
   // in ASM mode, non-byte-aligned values are expected to be zero-extended
@@ -1521,7 +1527,7 @@ void Memory::mkNonlocalValAxioms(const expr &block) const {
       expr::mkForAll(1, &offset, &name, mkSubByteZExtStoreCond(byte, byte)));
   }
 
-  if (!does_ptr_mem_access)
+  if (!does_ptr_mem_access())
     return;
 
   Pointer loadedptr = byte.ptr();
