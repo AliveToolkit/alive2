@@ -4626,7 +4626,7 @@ MemInstr::ByteAccessInfo Memcpy::getByteAccessInfo() const {
   // FIXME: memcpy doesn't have multi-byte support
   // Memcpy does not have sub-byte access, unless the sub-byte type appears
   // at other instructions
-  return { false, false, false, false, false, 1, 0 };
+  return { false, true, false, true, false, 1, 0 };
 }
 
 vector<Value*> Memcpy::operands() const {
