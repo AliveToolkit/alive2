@@ -96,7 +96,6 @@ public:
 
   friend std::ostream& operator<<(std::ostream &os, const Byte &byte);
   friend class Memory;
-  friend class TypedByte;
 };
 
 
