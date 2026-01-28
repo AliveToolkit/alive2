@@ -421,11 +421,21 @@ expr TypedByte::forceCastToInt() const {
 }
 
 expr TypedByte::nonPoison() const {
+  if (isAsmMode())
+    return expr::mkInt(-1, bits_poison_per_byte);
+
   switch (type) {
-  case DATA_NONE: return expr::mkInt(-1 * isAsmMode(), bits_poison_per_byte);
+  case DATA_NONE: return expr::mkUInt(0, bits_poison_per_byte);
   case DATA_INT:  return nonptrNonpoison();
-  case DATA_PTR:  return ptrNonpoison();
   case DATA_ANY:  return byte.nonPoison();
+  case DATA_PTR:  {
+    auto np = ptrNonpoison();
+    if (!does_int_mem_access)
+      return np;
+
+    auto zero = expr::mkUInt(0, bits_poison_per_byte);
+    return expr::mkIf(np, expr::mkInt(-1, zero), zero);
+  }
   }
 }
 
