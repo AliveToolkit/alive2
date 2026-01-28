@@ -26,6 +26,7 @@ namespace IR {
 class Memory;
 class SMTMemoryAccess;
 class State;
+struct TypedByte;
 
 
 // A data structure that represents a byte.
@@ -83,8 +84,6 @@ public:
 
   smt::expr&& operator()() && { return std::move(p); }
 
-  smt::expr refined(const Byte &other) const;
-
   smt::expr operator==(const Byte &rhs) const {
     return p == rhs.p;
   }
@@ -97,6 +96,37 @@ public:
 
   friend std::ostream& operator<<(std::ostream &os, const Byte &byte);
   friend class Memory;
+  friend class TypedByte;
+};
+
+
+enum DataType {
+  DATA_NONE = 0,
+  DATA_INT = 1,
+  DATA_PTR = 2,
+  DATA_ANY = DATA_INT | DATA_PTR
+};
+
+struct TypedByte {
+  Byte byte;
+  DataType type;
+
+  bool isAsmMode() const { return byte.isAsmMode(); }
+  smt::expr isPtr() const;
+  smt::expr forceCastToInt() const;
+  smt::expr nonPoison() const;
+  smt::expr isPoison() const;
+  smt::expr nonptrNonpoison() const { return byte.nonptrNonpoison(); }
+  smt::expr boolNonptrNonpoison() const { return byte.boolNonptrNonpoison(); }
+  smt::expr ptrNonpoison() const { return byte.ptrNonpoison(); }
+  Pointer ptr() const { return byte.ptr(); }
+  smt::expr nonptrValue() const { return byte.nonptrValue(); }
+  smt::expr castPtrToInt() const { return byte.castPtrToInt(); }
+  smt::expr ptrValue() const { return byte.ptrValue(); }
+  smt::expr ptrByteoffset() const { return byte.ptrByteoffset(); }
+  smt::expr numStoredBits() const { return byte.numStoredBits(); }
+  smt::expr byteNumber() const { return byte.byteNumber(); }
+  smt::expr refined(const TypedByte &other) const;
 };
 
 
@@ -135,6 +165,12 @@ class Memory {
   struct MemBlock {
     smt::expr val; // array: short offset -> Byte
     std::set<smt::expr> undef;
+    unsigned char type = DATA_ANY;
+
+    MemBlock() = default;
+    MemBlock(smt::expr &&val) : val(std::move(val)) {}
+    MemBlock(smt::expr &&val, DataType type)
+      : val(std::move(val)), type(type) {}
 
     std::weak_ordering operator<=>(const MemBlock &rhs) const;
   };
@@ -188,7 +224,8 @@ class Memory {
 
   smt::expr isBlockAlive(const smt::expr &bid, bool local) const;
 
-  smt::expr mkSubByteZExtStoreCond(const Byte &val, const Byte &val2) const;
+  smt::expr mkSubByteZExtStoreCond(const TypedByte &val,
+                                   const TypedByte &val2) const;
   void mkNonlocalValAxioms(const smt::expr &block) const;
 
   bool mayalias(const Pointer &p, bool local, unsigned bid,
@@ -203,15 +240,19 @@ class Memory {
               const std::function<void(MemBlock&, const Pointer&, unsigned,
                                        bool, smt::expr&&)> &fn);
 
-  std::vector<Byte> load(const Pointer &ptr, unsigned bytes,
-                         std::set<smt::expr> &undef, uint64_t align,
-                         bool left2right = true);
+  std::vector<TypedByte> load(const Pointer &ptr, unsigned bytes,
+                              std::set<smt::expr> &undef, uint64_t align,
+                              bool left2right = true);
   StateValue load(const Pointer &ptr, const Type &type,
                   std::set<smt::expr> &undef, uint64_t align);
 
+  DataType data_type(const std::vector<std::pair<unsigned, smt::expr>> &data,
+                     bool full_store) const;
+
   void store(const Pointer &ptr,
              const std::vector<std::pair<unsigned, smt::expr>> &data,
-             const std::set<smt::expr> &undef, uint64_t align);
+             const std::set<smt::expr> &undef, uint64_t align,
+             DataType orig_type = DATA_ANY);
   void store(const StateValue &val, const Type &type, unsigned offset,
              std::vector<std::pair<unsigned, smt::expr>> &data);
 
@@ -219,7 +260,7 @@ class Memory {
                    const smt::expr &bytes,
                    const std::vector<std::pair<unsigned, smt::expr>> &data,
                    const std::set<smt::expr> &undef, uint64_t align,
-                   bool full_write = false);
+                   bool full_write = false, DataType orig_type = DATA_ANY);
 
   // to implement the 'initializes' parameter attribute
   smt::expr hasStored(const Pointer &p, const smt::expr &bytes) const;
@@ -325,8 +366,8 @@ public:
     load(const smt::expr &ptr, const Type &type, uint64_t align);
 
   // raw load; NB: no UB check
-  Byte raw_load(const Pointer &p, std::set<smt::expr> &undef_vars);
-  Byte raw_load(const Pointer &p);
+  TypedByte raw_load(const Pointer &p, std::set<smt::expr> &undef_vars);
+  TypedByte raw_load(const Pointer &p);
 
   void memset(const smt::expr &ptr, const StateValue &val,
               const smt::expr &bytesize, uint64_t align,
@@ -379,7 +420,7 @@ public:
 private:
   static unsigned bitsAlignmentInfo();
   smt::expr mk_block_val_array(unsigned bid) const;
-  Byte raw_load(bool local, unsigned bid, const smt::expr &offset) const;
+  TypedByte raw_load(bool local, unsigned bid, const smt::expr &offset) const;
   void print_array(std::ostream &os, const smt::expr &a,
                    unsigned indent = 0) const;
 };

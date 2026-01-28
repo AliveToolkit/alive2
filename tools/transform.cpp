@@ -772,8 +772,10 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
 
     set<expr> undef;
     s << "\nMismatch in " << p1
-      << "\nSource value: " << Byte(src_mem, m[src_mem.raw_load(p1, undef)()])
-      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.raw_load(p2, undef)()]);
+      << "\nSource value: "
+      << Byte(src_mem, m[src_mem.raw_load(p1, undef).byte()])
+      << "\nTarget value: "
+      << Byte(tgt_mem, m[tgt_mem.raw_load(p2, undef).byte()]);
   };
 
   CHECK(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
@@ -1051,9 +1053,8 @@ static void calculateAndInitConstants(Transform &t) {
   uint64_t min_global_size = UINT64_MAX;
 
   bool has_null_pointer = false;
-  has_int2ptr       = false;
-  bool has_ptr2int  = false;
-  bool has_ptr2addr = false;
+  has_int2ptr     = false;
+  bool has_ptr2int     = false;
   has_alloca       = false;
   has_fncall       = false;
   has_write_fncall = false;
@@ -1200,9 +1201,8 @@ static void calculateAndInitConstants(Transform &t) {
                  isCast(ConversionOp::Ptr2Addr, i)) {
         max_alloc_size = max_access_size = cur_max_gep = loc_alloc_aligned_size
           = UINT64_MAX;
-        has_int2ptr  |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
-        has_ptr2int  |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
-        has_ptr2addr |= isCast(ConversionOp::Ptr2Addr, i) != nullptr;
+        has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
+        has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
         observes_addresses = true;
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
@@ -1256,8 +1256,7 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
-  observes_addresses |= has_int2ptr || has_ptr2int || has_ptr2addr ||
-                        does_int_mem_access /* ptr -> int load punning */;
+  observes_addresses |= does_int_mem_access /* ptr -> int load punning */;
 
   // condition can happen with ptr2int(poison) or e.g., load poison
   if ((has_ptr2int || does_mem_access) && num_nonlocals == 0) {
