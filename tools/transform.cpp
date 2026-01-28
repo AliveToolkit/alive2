@@ -1193,11 +1193,13 @@ static void calculateAndInitConstants(Transform &t) {
         has_alloca |= dynamic_cast<const Alloc*>(&i) != nullptr;
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
-                  isCast(ConversionOp::Ptr2Int, i)) {
+                 isCast(ConversionOp::Ptr2Int, i) ||
+                 isCast(ConversionOp::Ptr2Addr, i)) {
         max_alloc_size = max_access_size = cur_max_gep = loc_alloc_aligned_size
           = UINT64_MAX;
         has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
         has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
+        observes_addresses = true;
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
         auto &t = bc->getType();
@@ -1250,7 +1252,6 @@ static void calculateAndInitConstants(Transform &t) {
 
   num_nonlocals = num_nonlocals_src + num_globals - num_globals_src;
 
-  observes_addresses |= has_int2ptr || has_ptr2int;
   // condition can happen with ptr2int(poison) or e.g., load poison
   if ((has_ptr2int || does_mem_access) && num_nonlocals == 0) {
     ++num_nonlocals_src;

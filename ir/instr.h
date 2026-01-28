@@ -224,6 +224,41 @@ public:
 };
 
 
+class FpUnaryReductionOp final : public Instr {
+public:
+  enum Op {
+    FMin, FMax, FMinimum, FMaximum
+  };
+
+private:
+  Value *val;
+  Op op;
+  FastMathFlags fmath;
+  FpRoundingMode rm;
+  FpExceptionMode ex;
+
+public:
+  FpUnaryReductionOp(Type &type, std::string &&name, Value &val, Op op,
+                     FastMathFlags fmath, FpRoundingMode rm, FpExceptionMode ex)
+  : Instr(type, std::move(name)), val(&val), op(op), fmath(fmath), rm(rm), ex(ex) {}
+
+  Op getOp() const { return op; }
+
+  FastMathFlags getFastMathFlags() const { return fmath; }
+  FpRoundingMode getRoundingMode() const { return rm; }
+  FpExceptionMode getExceptionMode() const { return ex; }
+  std::vector<Value *> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
 class TernaryOp final : public Instr {
 public:
   enum Op { FShl, FShr, SMulFix, UMulFix, SMulFixSat, UMulFixSat,

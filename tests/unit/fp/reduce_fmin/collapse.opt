@@ -1,0 +1,14 @@
+Name: t0
+%v0 = extractelement <2 x float> %x, i8 0
+%v1 = extractelement <2 x float> %x, i8 1
+%r = fmin float %v0, %v1
+  =>
+%r = reduce_fmin <2 x float> %x
+
+Name: t1
+%r = fmin float %v0, %v1
+  =>
+%t0 = insertelement <2 x float> poison, float %v0, i8 0
+%t1 = insertelement <2 x float> %t0, float %v1, i8 1
+%r = reduce_fmin <2 x float> %t1
+

@@ -55,8 +55,12 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
     os << "allocalign ";
   if (attr.has(ParamAttrs::DeadOnUnwind))
     os << "dead_on_unwind ";
-  if (attr.has(ParamAttrs::DeadOnReturn))
-    os << "dead_on_return ";
+  if (attr.has(ParamAttrs::DeadOnReturn)) {
+    os << "dead_on_return";
+    if (attr.deadOnReturnBytes.has_value())
+      os << '(' << *attr.deadOnReturnBytes << ')';
+    os << ' ';
+  }
   if (attr.has(ParamAttrs::Writable))
     os << "writable ";
   if (!attr.initializes.empty()) {

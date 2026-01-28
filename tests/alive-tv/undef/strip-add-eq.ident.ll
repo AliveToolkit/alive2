@@ -8,4 +8,4 @@ A:
 B:
   ret i32 %x
 }
-; CHECK: return = %x / true
+; CHECK: return = %x / non-poison=true

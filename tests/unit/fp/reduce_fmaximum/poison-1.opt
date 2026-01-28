@@ -1,0 +1,10 @@
+Name: t0
+%r = reduce_fminimum <2 x float> poison
+  =>
+%r = poison
+
+Name: t1
+%r = reduce_fminimum <2 x float> poison
+  =>
+%r = undef
+

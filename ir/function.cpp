@@ -1136,7 +1136,11 @@ void LoopAnalysis::run() {
   type.resize(bb_count, NodeType::nonheader);
 
   for (auto [src, dst, instr] : cfg) {
-    unsigned v = number.at(&src), w = number.at(&dst);
+    auto vi = number.find(&src), wi = number.find(&dst);
+    if (vi == number.end() || wi == number.end())
+      continue;
+
+    unsigned v = vi->second, w = wi->second;
     if (isAncestor(w, v))
       backPreds[w].insert(v);
     else

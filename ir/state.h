@@ -294,7 +294,7 @@ public:
   /*--- Axioms, preconditions, domains ---*/
   void addAxiom(smt::AndExpr &&ands);
   void addAxiom(smt::expr &&axiom);
-  void addPre(smt::expr &&cond) { precondition.add(std::move(cond)); }
+  void addPre(smt::expr &&cond, bool quantify_undefs = true);
 
   // we have 2 types of UB to support -disallow-ub-exploitation
   // 1) UB that cannot be safeguarded, and 2) UB that can be safeguarded
