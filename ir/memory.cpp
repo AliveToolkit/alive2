@@ -11,6 +11,7 @@
 #include "util/config.h"
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <numeric>
 #include <string>
 
@@ -158,8 +159,9 @@ static bool byte_has_ptr_bit() {
 }
 
 static unsigned bits_ptr_byte_offset() {
-  assert(!does_int_mem_access() || bits_byte <= bits_program_pointer);
-  return bits_byte < bits_program_pointer ? 3 : 0;
+  if (bits_byte >= bits_program_pointer)
+    return 0;
+  return std::countr_zero(bits_program_pointer / bits_byte);
 }
 
 static unsigned padding_ptr_byte() {
