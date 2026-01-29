@@ -13,5 +13,5 @@ define i64 @tgt() {
   ret i64 %l
 }
 
-; CHECK: max_access_size: 8
+; CHECK: max_access_size: 18446744073709551615
 declare i64 @strlen(ptr)

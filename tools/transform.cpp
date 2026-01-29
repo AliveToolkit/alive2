@@ -772,8 +772,10 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
 
     set<expr> undef;
     s << "\nMismatch in " << p1
-      << "\nSource value: " << Byte(src_mem, m[src_mem.raw_load(p1, undef)()])
-      << "\nTarget value: " << Byte(tgt_mem, m[tgt_mem.raw_load(p2, undef)()]);
+      << "\nSource value: "
+      << Byte(src_mem, m[src_mem.raw_load(p1, undef).byte()])
+      << "\nTarget value: "
+      << Byte(tgt_mem, m[tgt_mem.raw_load(p2, undef).byte()]);
   };
 
   CHECK(dom && !(memory_cnstr0.isTrue() ? memory_cnstr0
@@ -992,6 +994,12 @@ static uint64_t aligned_alloc_size(uint64_t size, uint64_t align) {
   return add_saturate(size, align - 1);
 }
 
+static optional<uint64_t> gcd_opt(optional<uint64_t> a, uint64_t b) {
+  if (b == 0)
+    return a;
+  return a ? gcd(*a, b) : b;
+}
+
 static void calculateAndInitConstants(Transform &t) {
   if (!bits_program_pointer)
     initBitsProgramPointer(t);
@@ -1057,11 +1065,11 @@ static void calculateAndInitConstants(Transform &t) {
   has_fncall       = false;
   has_write_fncall = false;
   has_null_block   = false;
+  does_int_load    = false;
+  does_int_store   = false;
+  does_ptr_load    = false;
   does_ptr_store   = false;
-  does_ptr_mem_access = false;
-  does_int_mem_access = false;
   observes_addresses  = false;
-  bool does_any_byte_access = false;
   has_indirect_fncalls = false;
   has_ptr_arg = false;
   has_initializes_attr = false;
@@ -1071,12 +1079,11 @@ static void calculateAndInitConstants(Transform &t) {
   num_inaccessiblememonly_fns = 0;
 
   // Minimum access size (in bytes)
-  uint64_t min_access_size = 8;
+  optional<uint64_t> min_access_size;
   uint64_t loc_src_alloc_aligned_size = 0;
   uint64_t loc_tgt_alloc_aligned_size = 0;
   unsigned min_vect_elem_sz = 0;
   bool does_mem_access = false;
-  bool has_ptr_load = false;
 
   auto update_min_vect_sz = [&](const Type &ty) {
     auto elemsz = minVectorElemSize(ty);
@@ -1178,32 +1185,27 @@ static void calculateAndInitConstants(Transform &t) {
         cur_max_gep      = add_saturate(cur_max_gep, mi->getMaxGEPOffset());
 
         auto info = mi->getByteAccessInfo();
-        has_ptr_load         |= info.doesPtrLoad;
+        does_int_load        |= info.doesIntLoad;
+        does_int_store       |= info.doesIntStore;
+        does_ptr_load        |= info.doesPtrLoad;
         does_ptr_store       |= info.doesPtrStore;
-        does_int_mem_access  |= info.hasIntByteAccess;
         does_mem_access      |= info.doesMemAccess();
         observes_addresses   |= info.observesAddresses;
-        min_access_size       = gcd(min_access_size, info.byteSize);
+        min_access_size       = gcd_opt(min_access_size, info.byteSize);
         num_sub_byte_bits     = max(num_sub_byte_bits,
                                     (unsigned)bit_width(info.subByteAccess));
-        if (info.doesMemAccess() && !info.hasIntByteAccess &&
-            !info.doesPtrLoad && !info.doesPtrStore)
-          does_any_byte_access = true;
-
         has_alloca |= dynamic_cast<const Alloc*>(&i) != nullptr;
 
       } else if (isCast(ConversionOp::Int2Ptr, i) ||
                  isCast(ConversionOp::Ptr2Int, i) ||
                  isCast(ConversionOp::Ptr2Addr, i)) {
-        max_alloc_size = max_access_size = cur_max_gep = loc_alloc_aligned_size
-          = UINT64_MAX;
         has_int2ptr |= isCast(ConversionOp::Int2Ptr, i) != nullptr;
         has_ptr2int |= isCast(ConversionOp::Ptr2Int, i) != nullptr;
         observes_addresses = true;
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
         auto &t = bc->getType();
-        min_access_size = gcd(min_access_size, getCommonAccessSize(t));
+        min_access_size = gcd_opt(min_access_size, getCommonAccessSize(t));
 
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
         observes_addresses |= ic->isPtrCmp() &&
@@ -1220,11 +1222,6 @@ static void calculateAndInitConstants(Transform &t) {
     num_nonlocals_inst_src = df.getResult().num_nonlocals;
   }
 
-  does_ptr_mem_access = has_ptr_load || does_ptr_store;
-  if (does_any_byte_access && !does_int_mem_access && !does_ptr_mem_access)
-    // Use int bytes only
-    does_int_mem_access = true;
-
   unsigned num_locals = max(num_locals_src, num_locals_tgt);
 
   for (auto glbs : { &globals_src, &globals_tgt }) {
@@ -1240,7 +1237,7 @@ static void calculateAndInitConstants(Transform &t) {
   // check if null block is needed
   // Global variables cannot be null pointers
   has_null_block = num_null_ptrinputs > 0 || has_null_pointer ||
-                  has_ptr_load || has_fncall || has_int2ptr;
+                   does_ptr_load || has_fncall || has_int2ptr;
 
   num_nonlocals_src = num_globals_src + num_ptrinputs + num_nonlocals_inst_src +
                       num_inaccessiblememonly_fns + has_null_block;
@@ -1258,11 +1255,13 @@ static void calculateAndInitConstants(Transform &t) {
     ++num_nonlocals;
   }
 
-  if (!does_int_mem_access && !does_ptr_mem_access && has_fncall)
-    does_int_mem_access = true;
+  // ensure bytes contain something
+  if (does_mem_access && !does_int_load && !does_ptr_load && !does_ptr_store)
+    does_int_store = true;
 
-  if (does_int_mem_access && t.tgt.has(FnAttrs::Asm))
-    does_ptr_mem_access = true;
+  // account for ptr <-> int implicit conversions through memory
+  if (observes_addresses)
+    glb_alloc_aligned_size = max_alloc_size = max_access_size = UINT64_MAX;
 
   auto has_attr = [&](ParamAttrs::Attribute a) -> bool {
     for (auto fn : { &t.src, &t.tgt }) {
@@ -1303,10 +1302,6 @@ static void calculateAndInitConstants(Transform &t) {
   bits_for_offset = min(bits_for_offset, config::max_offset_bits);
   bits_for_offset = min(bits_for_offset, bits_program_pointer);
 
-  // we may have an implicit ptr2int through memory. Ensure we have enough bits
-  if (has_ptr_load && does_int_mem_access && t.tgt.has(FnAttrs::Asm))
-    bits_for_offset = bits_program_pointer;
-
   // ASSUMPTION: programs can only allocate up to half of address space
   // so the first bit of size is always zero.
   // We need this assumption to support negative offsets.
@@ -1328,13 +1323,10 @@ static void calculateAndInitConstants(Transform &t) {
                              bits_ptr_address) + has_local_bit,
                          bits_program_pointer);
 
-  if (t.tgt.has(FnAttrs::Asm))
-    bits_ptr_address = bits_program_pointer;
-
   // TODO: this is only needed if some program pointer is observable
   bits_for_offset = max(bits_ptr_address, bits_for_offset);
 
-  bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
+  bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size.value_or(1) : 1);
 
   bits_poison_per_byte = 1;
   if (min_vect_elem_sz > 0)
@@ -1361,7 +1353,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nmax_alloc_size: " << max_alloc_size
                   << "\nglb_alloc_aligned_size: " << glb_alloc_aligned_size
                   << "\nloc_alloc_aligned_size: " << loc_alloc_aligned_size
-                  << "\nmin_access_size: " << min_access_size
+                  << "\nmin_access_size: " << min_access_size.value_or(0)
                   << "\nmax_access_size: " << max_access_size
                   << "\nbits_byte: " << bits_byte
                   << "\nbits_poison_per_byte: " << bits_poison_per_byte
@@ -1371,10 +1363,11 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nnullptr_is_used: " << has_null_pointer
                   << "\nobserves_addresses: " << observes_addresses
                   << "\nhas_null_block: " << has_null_block
+                  << "\ndoes_int_load: " << does_int_load
+                  << "\ndoes_int_store: " << does_int_store
+                  << "\ndoes_ptr_load: " << does_ptr_load
                   << "\ndoes_ptr_store: " << does_ptr_store
                   << "\ndoes_mem_access: " << does_mem_access
-                  << "\ndoes_ptr_mem_access: " << does_ptr_mem_access
-                  << "\ndoes_int_mem_access: " << does_int_mem_access
                   << "\nnum_sub_byte_bits: " << num_sub_byte_bits
                   << "\nhas_ptr_arg: " << has_ptr_arg
                   << '\n';

@@ -1,4 +1,3 @@
-; TEST-ARGS: -disable-undef-input
 ; Found by Alive2
 target triple = "x86_64-pc-linux"
 

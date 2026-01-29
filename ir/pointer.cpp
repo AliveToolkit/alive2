@@ -838,7 +838,12 @@ expr Pointer::refined(const Pointer &other) const {
     return nonlocal;
 
   return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(is_local, local, nonlocal));
+                    // allow log(0, offset) -> phy(offset) refinement
+                    // This may increases provenance, so it's a sound refinement
+                    expr::mkIf(isLogical() && !other.isLogical() && !is_asm &&
+                                 getBid() == 0,
+                               getAddress() == other.getAddress(),
+                               expr::mkIf(is_local, local, nonlocal)));
 }
 
 expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
