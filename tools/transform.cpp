@@ -994,7 +994,9 @@ static uint64_t aligned_alloc_size(uint64_t size, uint64_t align) {
   return add_saturate(size, align - 1);
 }
 
-static uint64_t gcd_opt(optional<uint64_t> a, uint64_t b) {
+static optional<uint64_t> gcd_opt(optional<uint64_t> a, uint64_t b) {
+  if (b == 0)
+    return a;
   return a ? gcd(*a, b) : b;
 }
 
