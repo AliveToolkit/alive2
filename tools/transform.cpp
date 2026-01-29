@@ -994,6 +994,10 @@ static uint64_t aligned_alloc_size(uint64_t size, uint64_t align) {
   return add_saturate(size, align - 1);
 }
 
+static uint64_t gcd_opt(optional<uint64_t> a, uint64_t b) {
+  return a ? gcd(*a, b) : b;
+}
+
 static void calculateAndInitConstants(Transform &t) {
   if (!bits_program_pointer)
     initBitsProgramPointer(t);
@@ -1073,7 +1077,7 @@ static void calculateAndInitConstants(Transform &t) {
   num_inaccessiblememonly_fns = 0;
 
   // Minimum access size (in bytes)
-  uint64_t min_access_size = 8;
+  optional<uint64_t> min_access_size;
   uint64_t loc_src_alloc_aligned_size = 0;
   uint64_t loc_tgt_alloc_aligned_size = 0;
   unsigned min_vect_elem_sz = 0;
@@ -1185,7 +1189,7 @@ static void calculateAndInitConstants(Transform &t) {
         does_ptr_store       |= info.doesPtrStore;
         does_mem_access      |= info.doesMemAccess();
         observes_addresses   |= info.observesAddresses;
-        min_access_size       = gcd(min_access_size, info.byteSize);
+        min_access_size       = gcd_opt(min_access_size, info.byteSize);
         num_sub_byte_bits     = max(num_sub_byte_bits,
                                     (unsigned)bit_width(info.subByteAccess));
         has_alloca |= dynamic_cast<const Alloc*>(&i) != nullptr;
@@ -1199,7 +1203,7 @@ static void calculateAndInitConstants(Transform &t) {
 
       } else if (auto *bc = isCast(ConversionOp::BitCast, i)) {
         auto &t = bc->getType();
-        min_access_size = gcd(min_access_size, getCommonAccessSize(t));
+        min_access_size = gcd_opt(min_access_size, getCommonAccessSize(t));
 
       } else if (auto *ic = dynamic_cast<const ICmp*>(&i)) {
         observes_addresses |= ic->isPtrCmp() &&
@@ -1320,7 +1324,7 @@ static void calculateAndInitConstants(Transform &t) {
   // TODO: this is only needed if some program pointer is observable
   bits_for_offset = max(bits_ptr_address, bits_for_offset);
 
-  bits_byte = 8 * (does_mem_access ?  (unsigned)min_access_size : 1);
+  bits_byte = 8 * (does_mem_access ? (unsigned)min_access_size.value_or(1) : 1);
 
   bits_poison_per_byte = 1;
   if (min_vect_elem_sz > 0)
@@ -1347,7 +1351,7 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nmax_alloc_size: " << max_alloc_size
                   << "\nglb_alloc_aligned_size: " << glb_alloc_aligned_size
                   << "\nloc_alloc_aligned_size: " << loc_alloc_aligned_size
-                  << "\nmin_access_size: " << min_access_size
+                  << "\nmin_access_size: " << min_access_size.value_or(0)
                   << "\nmax_access_size: " << max_access_size
                   << "\nbits_byte: " << bits_byte
                   << "\nbits_poison_per_byte: " << bits_poison_per_byte
@@ -1357,6 +1361,9 @@ static void calculateAndInitConstants(Transform &t) {
                   << "\nnullptr_is_used: " << has_null_pointer
                   << "\nobserves_addresses: " << observes_addresses
                   << "\nhas_null_block: " << has_null_block
+                  << "\ndoes_int_load: " << does_int_load
+                  << "\ndoes_int_store: " << does_int_store
+                  << "\ndoes_ptr_load: " << does_ptr_load
                   << "\ndoes_ptr_store: " << does_ptr_store
                   << "\ndoes_mem_access: " << does_mem_access
                   << "\nnum_sub_byte_bits: " << num_sub_byte_bits
