@@ -2768,7 +2768,25 @@ StateValue FnCall::toSMT(State &s) const {
   if (attrs.has(AllocKind::Alloc) ||
       attrs.has(AllocKind::Realloc) ||
       attrs.has(FnAttrs::AllocSize)) {
-    auto [size, np_size] = attrs.computeAllocSize(s, args);
+
+    smt::expr size;
+    smt::expr np_size;
+
+    if (!attrs.has(FnAttrs::AllocSize)) {
+      static IntType sizet_type(string("size_t"), config::max_sizet_bits);
+      FnAttrs readonly_attrs = attrs;
+      readonly_attrs.mem.setCanOnlyRead();
+      auto result = s.addFnCall(std::move(fnName_mangled).str(), std::move(inputs),
+                         std::move(ptr_inputs), sizet_type, StateValue{},
+                         nullptr, std::vector<StateValue>{}, readonly_attrs, indirect_hash);
+      size = std::move(result.value);
+      np_size = std::move(result.non_poison);
+    } else {
+      auto result = attrs.computeAllocSize(s, args);
+      size = std::move(result.first);
+      np_size = std::move(result.second);
+    }
+    
     expr nonnull = attrs.isNonNull() ? expr(true)
                                      : expr::mkBoolVar("malloc_never_fails");
     // FIXME: alloc-family below
