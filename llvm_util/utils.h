@@ -38,7 +38,7 @@ IR::BasicBlock& getBB(const llvm::BasicBlock *bb);
 
 std::string value_name(const llvm::Value &v);
 
-IR::Type& get_int_type(unsigned bits);
+IR::Type* get_int_type(unsigned bits);
 IR::Type* llvm_type2alive(const llvm::Type *ty);
 
 IR::Value* make_intconst(uint64_t val, int bits);

@@ -1418,7 +1418,7 @@ public:
       case LLVMContext::MD_callees: {
         auto *fn_call = dynamic_cast<FnCall*>(i);
         assert(fn_call);
-        auto &i1_type = get_int_type(1);
+        auto &i1_type = *get_int_type(1);
         Value *last_value = nullptr;
 
         for (auto &Op : Node->operands()) {

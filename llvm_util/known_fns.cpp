@@ -652,8 +652,8 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
       // (void)fwrite(const void *ptr, 1, 1, FILE *stream) ->
       //   (void)fputc(int c, FILE *stream))
       if (bytes == 1 && i.use_empty() && TLI.has(llvm::LibFunc_fputc)) {
-        auto &byteTy = get_int_type(8); // FIXME
-        auto &i32 = get_int_type(32);
+        auto &byteTy = *get_int_type(8); // FIXME
+        auto &i32 = *get_int_type(32);
         auto load
           = make_unique<Load>(byteTy, value_name(i) + "#load", *args[0], 1);
         auto load_zext
