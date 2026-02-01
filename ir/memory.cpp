@@ -2670,13 +2670,6 @@ void Memory::copy(const Pointer &src, const Pointer &dst) {
   dst_blk.val = *std::move(val)();
 }
 
-void Memory::fillPoison(const expr &bid) {
-  Pointer p(*this, bid, expr::mkUInt(0, bits_for_offset));
-  expr blksz = p.blockSize();
-  memset(std::move(p).release(), IntType("i8", 8).getDummyValue(false),
-         std::move(blksz), bits_byte / 8, {}, false);
-}
-
 expr Memory::ptr2int(const expr &ptr, bool escapes) {
   assert(!memory_unused() && observesAddresses());
   Pointer p(*this, ptr);

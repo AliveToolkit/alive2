@@ -4568,49 +4568,6 @@ unique_ptr<Instr> MemsetPattern::dup(Function &f, const string &suffix) const {
 }
 
 
-DEFINE_AS_RETZEROALIGN(FillPoison, getMaxAllocSize)
-DEFINE_AS_RETZERO(FillPoison, getMaxGEPOffset)
-
-uint64_t FillPoison::getMaxAccessSize() const {
-  return getGlobalVarSize(ptr);
-}
-
-MemInstr::ByteAccessInfo FillPoison::getByteAccessInfo() const {
-  return ByteAccessInfo::anyType(1);
-}
-
-vector<Value*> FillPoison::operands() const {
-  return { ptr };
-}
-
-bool FillPoison::propagatesPoison() const {
-  return true;
-}
-
-void FillPoison::rauw(const Value &what, Value &with) {
-  RAUW(ptr);
-}
-
-void FillPoison::print(ostream &os) const {
-  os << "fillpoison " << *ptr;
-}
-
-StateValue FillPoison::toSMT(State &s) const {
-  auto &vptr = s.getWellDefinedPtr(*ptr);
-  Memory &m = s.getMemory();
-  m.fillPoison(Pointer(m, vptr).getBid());
-  return {};
-}
-
-expr FillPoison::getTypeConstraints(const Function &f) const {
-  return ptr->getType().enforcePtrType();
-}
-
-unique_ptr<Instr> FillPoison::dup(Function &f, const string &suffix) const {
-  return make_unique<FillPoison>(*ptr);
-}
-
-
 DEFINE_AS_RETZEROALIGN(Memcpy, getMaxAllocSize)
 DEFINE_AS_RETZERO(Memcpy, getMaxGEPOffset)
 
