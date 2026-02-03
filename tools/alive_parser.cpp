@@ -1367,7 +1367,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case POISON:
   case REGISTER:
   case ARRAY_TYPE_PREFIX:
-    return parse_copyop(name, t);
+    if (!name.empty())
+      return parse_copyop(name, t);
   default:
     tokenizer.unget(t);
     return nullptr;
