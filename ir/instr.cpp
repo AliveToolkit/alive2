@@ -3032,7 +3032,10 @@ expr ICmp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ICmp::dup(Function &f, const string &suffix) const {
-  return make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b, flags);
+  auto dup = make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b,
+                               flags);
+  dup->setPtrCmpMode(pcmode);
+  return dup;
 }
 
 
