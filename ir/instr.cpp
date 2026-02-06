@@ -3293,7 +3293,7 @@ expr Phi::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Phi::dup(Function &f, const string &suffix) const {
-  auto phi = make_unique<Phi>(getType(), getName() + suffix);
+  auto phi = make_unique<Phi>(getType(), getName() + suffix, fmath);
   for (auto &[val, bb] : values) {
     phi->addValue(*val, string(bb));
   }
