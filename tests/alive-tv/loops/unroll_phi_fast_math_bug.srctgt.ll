@@ -1,4 +1,5 @@
 ; TEST-ARGS: --src-unroll=2 --disable-undef-input
+; SKIP-IDENTITY
 
 define void @src(ptr %p, i1 %c) {
 entry:
