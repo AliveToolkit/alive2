@@ -5,6 +5,7 @@
 
 #include "ir/attrs.h"
 #include "smt/expr.h"
+#include "util/config.h"
 
 #include <functional>
 #include <memory>
@@ -335,9 +336,14 @@ public:
 
 
 class VectorType final : public AggregateType {
+private:
+  bool scalable = false;
+  unsigned min_elements, vscale_value;
+
 public:
+  smt::expr vscale() const;
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
-  VectorType(std::string &&name, unsigned elements, Type &elementTy);
+  VectorType(std::string &&name, unsigned elems, Type &elemTy, bool scalable);
 
   IR::StateValue extract(const IR::StateValue &vector,
                          const smt::expr &index) const;
@@ -348,6 +354,7 @@ public:
   unsigned maxSubBitAccess() const override;
   smt::expr scalarSize() const override;
   bool isVectorType() const override;
+  void fixup(const smt::Model &m) override;
   smt::expr enforceVectorType(
     const std::function<smt::expr(const Type&)> &enforceElem) const override;
   void print(std::ostream &os) const override;
