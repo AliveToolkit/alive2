@@ -1,6 +1,6 @@
 <?php
 
-$data = `grep 'ERROR: ' *.txt | grep -v Invalid`;
+$data = `grep -a 'ERROR: ' *.txt | grep -v Invalid`;
 $data = explode("\n", trim($data));
 
 $errors = array(
@@ -34,7 +34,7 @@ found:
   @++$table[$m[1]][$err];
 }
 
-$data = `egrep '  [0-9]+ (in)?correct transformations' *.txt`;
+$data = `egrep -a '  [0-9]+ (in)?correct transformations' *.txt`;
 $data = explode("\n", trim($data));
 foreach ($data as $line) {
   preg_match('/(.+)\.txt:  (\d+) (in)?/S', $line, $m);
@@ -42,7 +42,7 @@ foreach ($data as $line) {
   $table[$m[1]][$col] = $m[2];
 }
 
-$data = `egrep '^[.0-9]+user [.0-9]+system' *.txt`;
+$data = `egrep -a '^[.0-9]+user [.0-9]+system' *.txt`;
 $data = explode("\n", trim($data));
 foreach ($data as $line) {
   preg_match('/(.+)\.txt:(\d+)/S', $line, $m);
