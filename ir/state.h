@@ -145,6 +145,7 @@ private:
     std::set<smt::expr> undef_vars;
     ValueAnalysis analysis;
     VarArgsData var_args;
+    smt::DisjointExpr<smt::expr> errno_val;
   };
 
   const Function &f;
@@ -187,6 +188,7 @@ private:
   Memory memory;
   smt::expr fp_rounding_mode;
   smt::expr fp_denormal_mode;
+  smt::expr errno_val;
   std::set<smt::expr> undef_vars;
   ValueAnalysis analysis;
   std::array<StateValue, 64> tmp_values;
@@ -205,6 +207,7 @@ private:
   std::variant<smt::DisjointExpr<StateValue>, StateValue> return_val;
   std::variant<smt::DisjointExpr<Memory>, Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
+  smt::expr return_errno;
 
   struct FnCallInput {
     std::vector<StateValue> args_nonptr;
@@ -232,6 +235,7 @@ private:
     smt::expr noreturns;
     Memory::CallState callstate;
     std::vector<Memory::FnRetData> ret_data;
+    smt::expr errno_val;
 
     FnCallOutput replace(const StateValue &retval) const;
 
@@ -352,6 +356,10 @@ public:
   const auto& getQuantVars() const { return quantified_vars; }
   const auto& getNondetVars() const { return nondet_vars; }
   const auto& getFnQuantVars() const { return fn_call_qvars; }
+
+  const auto& getErrno() const { return errno_val; }
+  void setErrno(smt::expr &&val) { errno_val = std::move(val); }
+  auto& getReturnErrno() const { return return_errno; }
 
   const std::optional<StateValue>& getReturnedInput() const {
     return returned_input;

@@ -302,7 +302,9 @@ State::State(const Function &f, bool source)
   : f(f), source(source), memory(*this),
     fp_rounding_mode(expr::mkVar("fp_rounding_mode", 3)),
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
-    return_val(DisjointExpr(f.getType().getDummyValue(false))) {
+    errno_val(expr::mkVar("errno_init", expr::mkUInt(0, 32))),
+    return_val(DisjointExpr(f.getType().getDummyValue(false))),
+    return_errno(expr::mkUInt(0, 32)) {
   predecessor_data.reserve(f.getNumBBs());
 }
 
@@ -794,6 +796,7 @@ bool State::startBB(const BasicBlock &bb) {
   DisjointExpr<Memory> in_memory;
   DisjointExpr<AndExpr> UB;
   DisjointExpr<VarArgsData> var_args_in;
+  DisjointExpr<expr> errno_in;
   OrExpr path;
 
   domain.UB = AndExpr();
@@ -807,6 +810,7 @@ bool State::startBB(const BasicBlock &bb) {
     // This data is never used again, so clean it up to reduce mem consumption
     in_memory.add_disj(std::move(data.mem), p);
     var_args_in.add(std::move(data.var_args), std::move(p));
+    errno_in.add_disj(std::move(data.errno_val), p);
     domain.undef_vars.insert(data.undef_vars.begin(), data.undef_vars.end());
     data.undef_vars.clear();
 
@@ -825,6 +829,7 @@ bool State::startBB(const BasicBlock &bb) {
   domain.path   = std::move(path)();
   memory        = *std::move(in_memory)();
   var_args_data = *std::move(var_args_in)();
+  errno_val     = *std::move(errno_in)();
 
   if (src_state)
     copyUBFromBB(I->second);
@@ -858,6 +863,7 @@ void State::addJump(expr &&cond, const BasicBlock &dst0, bool always_jump) {
   data.path.add(std::move(cond));
   data.undef_vars.insert(undef_vars.begin(), undef_vars.end());
   data.undef_vars.insert(domain.undef_vars.begin(), domain.undef_vars.end());
+  data.errno_val.add(errno_val, cond);
 
   if (always_jump)
     domain.path = false;
@@ -877,6 +883,7 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 void State::addReturn(StateValue &&val) {
   get<0>(return_val).add(std::move(val), domain.path);
   get<0>(return_memory).add(std::move(memory), domain.path);
+  return_errno = expr::mkIf(domain.path, errno_val, return_errno);
   auto dom = domain();
   return_domain.add(expr(dom));
   function_domain.add(std::move(dom));
@@ -1057,6 +1064,7 @@ State::FnCallOutput State::FnCallOutput::mkIf(const expr &cond,
   ret.ub        = expr::mkIf(cond, a.ub, b.ub);
   ret.noreturns = expr::mkIf(cond, a.noreturns, b.noreturns);
   ret.callstate = Memory::CallState::mkIf(cond, a.callstate, b.callstate);
+  ret.errno_val = expr::mkIf(cond, a.errno_val, b.errno_val);
 
   assert(a.ret_data.size() == b.ret_data.size());
   for (unsigned i = 0, e = a.ret_data.size(); i != e; ++i) {
@@ -1071,6 +1079,7 @@ expr State::FnCallOutput::refines(const FnCallOutput &rhs,
   expr ret = ub == rhs.ub;
   ret     &= noreturns == rhs.noreturns;
   ret     &= callstate == rhs.callstate;
+  ret     &= errno_val == rhs.errno_val; 
 
   function<void(const StateValue&, const StateValue&, const Type&)> check_out
     = [&](const StateValue &a, const StateValue &b, const Type &ty) -> void {
@@ -1262,6 +1271,11 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         }
       }
 
+      expr errno_on_write = expr::mkFreshVar((name + "#errno").c_str(),
+                                             expr::mkUInt(0, 32));
+      expr errno_data = mkIf_fold(memaccess.canWrite(MemoryAccess::Errno),
+                                  errno_on_write, errno_val);
+
       I->second
         = { std::move(output), expr::mkFreshVar((name + "#ub").c_str(), false),
             (noret || willret)
@@ -1269,7 +1283,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
               : expr::mkFreshVar((name + "#noreturn").c_str(), false),
             memory.mkCallState(name, attrs.has(FnAttrs::NoFree),
                                I->first.args_ptr.size(), memaccess),
-            std::move(ret_data) };
+            std::move(ret_data), std::move(errno_data) };
 
       // add equality constraints between source's function calls
       for (auto II = calls_fn.begin(), E = calls_fn.end(); II != E; ++II) {
@@ -1284,6 +1298,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
     addUB(I->second.ub);
     addNoReturn(I->second.noreturns);
     retval = I->second.retval;
+    errno_val = I->second.errno_val;
     memory.setState(I->second.callstate, memaccess, I->first.args_ptr,
                     inaccessible_bid);
   }
@@ -1338,6 +1353,7 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         retval = std::move(d.retval);
 
       memory.setState(d.callstate, memaccess, ptr_inputs, inaccessible_bid);
+      errno_val = d.errno_val;
 
       fn_call_pre &= pre;
       if (qvar.isValid())
@@ -1551,6 +1567,7 @@ void State::cleanup() {
   domain = {};
   analysis = {};
   var_args_data = {};
+  errno_val = {};
 }
 
 }
