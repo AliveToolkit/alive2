@@ -185,4 +185,9 @@ llvm::cl::opt<bool> opt_disallow_ub_exploitation(
   llvm::cl::desc("Disallow UB exploitation by optimizations (default=allow)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<unsigned> opt_vscale(LLVM_ARGS_PREFIX "vscale",
+  llvm::cl::desc("Set vscale value for scalable vectors (default=2)"),
+  llvm::cl::init(2), llvm::cl::value_desc("value"),
+  llvm::cl::cat(alive_cmdargs));
+
 }

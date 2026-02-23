@@ -1,0 +1,15 @@
+; TEST-ARGS: -vscale:2
+Name: insert and extract on same location
+%t = insertelement <vscale x 2 x i4> %vec, i4 %x, i64 3
+%r = extractelement <vscale x 2 x i4> %t, i64 3
+  =>
+%r = i4 %x
+
+
+Name: insert and extract on different location
+%t = insertelement <vscale x 2 x i4> %vec, i4 %x, i64 3
+%r = extractelement <vscale x 2 x i4> %t, i64 0
+  =>
+%r = i4 %x
+
+; ERROR: Target is more poisonous than source for i4 %r
