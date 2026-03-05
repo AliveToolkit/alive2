@@ -1207,7 +1207,10 @@ static expr mk_store(expr mem, const expr &offset, const expr &val) {
 
 TypedByte Memory::raw_load(bool local, unsigned bid, const expr &offset) const {
   auto &block = (local ? local_block_val : non_local_block_val)[bid];
-  return { Byte(*this, ::raw_load(block.val, offset)), DataType(block.type) };
+  expr alive = isBlockAlive(expr::mkUInt(bid, Pointer::bitsShortBid()), local);
+  return { Byte(*this, mkIf_fold(alive, ::raw_load(block.val, offset),
+                                Byte::mkPoisonByte(*this)())),
+           DataType(block.type) };
 }
 
 vector<TypedByte>
@@ -1234,7 +1237,10 @@ Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
       assert(idx < blk_size);
       uint64_t max_idx = blk_size - bytes + idx;
       expr off = blk_offset + expr::mkUInt(idx, offset);
-      loaded[i].first.add(::raw_load(blk.val, off, max_idx), cond);
+      expr is_alive = isBlockAlive(bid, local);
+      loaded[i].first.add(mkIf_fold(is_alive, ::raw_load(blk.val, off, max_idx),
+                                    poison),
+                          cond);
       loaded[i].second |= blk.type;
     }
     undef.insert(blk.undef.begin(), blk.undef.end());
