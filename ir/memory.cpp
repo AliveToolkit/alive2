@@ -1417,7 +1417,7 @@ expr Memory::hasStored(const Pointer &p, const expr &bytes) const {
     expr var = expr::mkFreshVar("#off", offset);
     state->addQuantVar(var);
     expr bytes_div = bytes.zextOrTrunc(offset.bits())
-                          .udiv(expr::mkUInt(bytes_per_byte, bytes));
+                          .udiv(expr::mkUInt(bytes_per_byte, offset));
     return (var.uge(offset) && var.ult(offset + bytes_div))
              .implies(has_stored_arg.load(bid.concat(var)));
   }
@@ -1448,7 +1448,7 @@ void Memory::record_store(const Pointer &p, const expr &bytes) {
     expr var_off = var.trunc(offset.bits());
 
     expr bytes_div = bytes.zextOrTrunc(offset.bits())
-                          .udiv(expr::mkUInt(bytes_per_byte, bytes));
+                          .udiv(expr::mkUInt(bytes_per_byte, offset));
     has_stored_arg
       = expr::mkIf(is_local,
                    has_stored_arg,

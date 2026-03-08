@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os:         [ubuntu-24.04]
-        compiler:   [g++-14, clang++-21, clang++-22]
+        compiler:   [g++-14, clang++-22, clang++-23]
         build_type: [Release, Debug]
         cache:      ['', Redis]
         include:
@@ -29,19 +29,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           wget -O- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          if [[ ${{ matrix.compiler }} == "clang++-21" ]]; then
-            sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
-          fi
           if [[ ${{ matrix.compiler }} == "clang++-22" ]]; then
+            sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-22 main"
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-23" ]]; then
             sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble main"
           fi
           sudo apt-get update
           sudo apt-get install z3 re2c ninja-build
-          if [[ ${{ matrix.compiler }} == "clang++-21" ]]; then
-            sudo apt-get install clang++-21
-          fi
           if [[ ${{ matrix.compiler }} == "clang++-22" ]]; then
             sudo apt-get install clang++-22
+          fi
+          if [[ ${{ matrix.compiler }} == "clang++-23" ]]; then
+            sudo apt-get install clang++-23
           fi
           if [[ "${{ matrix.cache }}" == "Redis" ]]; then
             sudo apt-get install libhiredis-dev

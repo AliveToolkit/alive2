@@ -676,7 +676,7 @@ static expr fminimum_fmaximum(State &s, const expr &a, const expr &b,
   return expr::mkIf(a.isNaN(), a, expr::mkIf(b.isNaN(), b, e));
 }
 
-static expr any_fp_zero(State &s, const expr &v) {
+static expr any_fp_zero(State &s, expr v) {
   expr is_zero = v.isFPZero();
   if (is_zero.isFalse())
     return v;
@@ -688,7 +688,7 @@ static expr any_fp_zero(State &s, const expr &v) {
       expr a, b;
       if (cond.isAnd(a, b) && a.isVar() && a.fn_name().starts_with("anyzero") &&
           b.isIsFPZero())
-        return any_fp_zero(s, val);
+        return any_fp_zero(s, std::move(val));
     }
   }
 
@@ -767,11 +767,11 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   auto &fpty = *from_ty.getAsFloatType();
 
   if (fmath.flags & FastMathFlags::NSZ) {
-    a = any_fp_zero(s, a);
+    a = any_fp_zero(s, std::move(a));
     if (nary >= 2) {
-      b = any_fp_zero(s, b);
+      b = any_fp_zero(s, std::move(b));
       if (nary == 3)
-        c = any_fp_zero(s, c);
+        c = any_fp_zero(s, std::move(c));
     }
   }
 
@@ -824,8 +824,6 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     val = expr::mkUF("afn", { val }, val);
     s.doesApproximation("afn", val);
   }
-  if (!flags_in_only && fmath.flags & FastMathFlags::NSZ)
-    val = any_fp_zero(s, std::move(val));
 
   if (!bitwise && val.isFloat()) {
     val = handle_subnormal(s,
@@ -3032,7 +3030,10 @@ expr ICmp::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> ICmp::dup(Function &f, const string &suffix) const {
-  return make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b, flags);
+  auto dup = make_unique<ICmp>(getType(), getName() + suffix, cond, *a, *b,
+                               flags);
+  dup->setPtrCmpMode(pcmode);
+  return dup;
 }
 
 
@@ -3293,7 +3294,7 @@ expr Phi::getTypeConstraints(const Function &f) const {
 }
 
 unique_ptr<Instr> Phi::dup(Function &f, const string &suffix) const {
-  auto phi = make_unique<Phi>(getType(), getName() + suffix);
+  auto phi = make_unique<Phi>(getType(), getName() + suffix, fmath);
   for (auto &[val, bb] : values) {
     phi->addValue(*val, string(bb));
   }
