@@ -207,7 +207,7 @@ private:
   std::variant<smt::DisjointExpr<StateValue>, StateValue> return_val;
   std::variant<smt::DisjointExpr<Memory>, Memory> return_memory;
   std::set<smt::expr> return_undef_vars;
-  smt::expr return_errno;
+  std::variant<smt::DisjointExpr<smt::expr>, smt::expr> return_errno;
 
   struct FnCallInput {
     std::vector<StateValue> args_nonptr;
@@ -359,7 +359,7 @@ public:
 
   const auto& getErrno() const { return errno_val; }
   void setErrno(smt::expr &&val) { errno_val = std::move(val); }
-  auto& getReturnErrno() const { return return_errno; }
+  smt::expr getReturnErrno();
 
   const std::optional<StateValue>& getReturnedInput() const {
     return returned_input;

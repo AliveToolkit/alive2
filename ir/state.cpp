@@ -304,7 +304,7 @@ State::State(const Function &f, bool source)
     fp_denormal_mode(expr::mkVar("fp_denormal_mode", 2)),
     errno_val(expr::mkVar("errno_init", expr::mkUInt(0, 32))),
     return_val(DisjointExpr(f.getType().getDummyValue(false))),
-    return_errno(expr::mkUInt(0, 32)) {
+    return_errno(DisjointExpr(expr::mkUInt(0, 32))) {
   predecessor_data.reserve(f.getNumBBs());
 }
 
@@ -883,7 +883,7 @@ void State::addCondJump(const expr &cond, const BasicBlock &dst_true,
 void State::addReturn(StateValue &&val) {
   get<0>(return_val).add(std::move(val), domain.path);
   get<0>(return_memory).add(std::move(memory), domain.path);
-  return_errno = expr::mkIf(domain.path, errno_val, return_errno);
+  get<0>(return_errno).add(errno_val, domain.path);
   auto dom = domain();
   return_domain.add(expr(dom));
   function_domain.add(std::move(dom));
@@ -1271,10 +1271,9 @@ State::addFnCall(const string &name, vector<StateValue> &&inputs,
         }
       }
 
-      expr errno_on_write = expr::mkFreshVar((name + "#errno").c_str(),
-                                             expr::mkUInt(0, 32));
-      expr errno_data = mkIf_fold(memaccess.canWrite(MemoryAccess::Errno),
-                                  errno_on_write, errno_val);
+      expr errno_data = mkIf_fold(
+          memaccess.canWrite(MemoryAccess::Errno),
+          expr::mkFreshVar((name + "#errno").c_str(), errno_val), errno_val);
 
       I->second
         = { std::move(output), expr::mkFreshVar((name + "#ub").c_str(), false),
@@ -1419,6 +1418,13 @@ StateValue State::rewriteUndef(StateValue &&val, const set<expr> &undef_vars) {
 
 expr State::rewriteUndef(expr &&val, const set<expr> &undef_vars) {
   return rewriteUndef({std::move(val), expr()}, undef_vars).value;
+}
+
+expr State::getReturnErrno() {
+  if (auto *e = get_if<DisjointExpr<expr>>(&return_errno)) {
+    return_errno = *std::move(*e)();
+  }
+  return get<expr>(return_errno);
 }
 
 void State::finishInitializer() {
