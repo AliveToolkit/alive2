@@ -3,6 +3,8 @@
 
 #include "ir/function.h"
 #include "ir/instr.h"
+#include "ir/type.h"
+#include "util/config.h"
 #include "util/errors.h"
 #include "util/hash.h"
 #include "util/sort.h"
@@ -168,7 +170,12 @@ expr Function::getTypeConstraints() const {
       t &= v.getTypeConstraints();
     }
   }
+
   return t;
+}
+
+expr Function::getVScaleExpr() const {
+  return VectorType::getVScaleVar();
 }
 
 void Function::rauw(const Value &what, Value &with) {

@@ -974,6 +974,35 @@ unique_ptr<Instr> FpBinOp::dup(Function &f, const string &suffix) const {
 }
 
 
+vector<Value*> VScale::operands() const {
+  return {};
+}
+
+bool VScale::propagatesPoison() const { return false; }
+
+bool VScale::hasSideEffects() const { return false; }
+
+void VScale::rauw(const Value &what, Value &with) {}
+
+void VScale::print(ostream &os) const {
+  os << getName() << " = vscale";
+}
+
+StateValue VScale::toSMT(State &s) const {
+  auto e = s.getFn().getVScaleExpr();
+  return { e.zextOrTrunc(bits()), true };
+}
+
+expr VScale::getTypeConstraints(const Function &f) const {
+  return Value::getTypeConstraints() &&
+         getType().enforceIntType();
+}
+
+unique_ptr<Instr> VScale::dup(Function &f, const string &suffix) const {
+  return make_unique<VScale>(getType(), getName() + suffix);
+}
+
+
 vector<Value*> UnaryOp::operands() const {
   return { val };
 }
