@@ -183,6 +183,7 @@ public:
   bool hasReturn() const;
   unsigned bitsPointers() const { return bits_pointers; }
   unsigned bitsPtrOffset() const { return bits_ptr_offset; }
+  smt::expr getVScaleExpr() const;
   bool isLittleEndian() const { return little_endian; }
   bool isVarArgs() const { return is_var_args; }
 
