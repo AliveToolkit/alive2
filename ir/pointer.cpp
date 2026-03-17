@@ -852,9 +852,19 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
   auto [p1l, d1] = toLogicalLocal();
   auto [p2l, d2] = other.toLogicalLocal();
 
-  // TODO: check block value for byval_bytes
-  if (!byval_bytes.isZero())
-    return true;
+  if (!byval_bytes.isZero()) {
+    uint64_t bytes;
+    if (!byval_bytes.isUInt(bytes))
+      return false;
+
+    expr byval_refined = true;
+    for (uint64_t off = 0; off < bytes; ++off) {
+      auto src_byte = m.raw_load(*this + off, undef);
+      auto tgt_byte = other.m.raw_load(other + off, undef);
+      byval_refined &= src_byte.refined(tgt_byte);
+    }
+    return byval_refined;
+  }
 
   expr local = d2 && (p2l.isLocal() || p2l.isByval()) &&
                at_least_same_offseting(p1l, p2l, false);
