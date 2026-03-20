@@ -102,6 +102,23 @@ public:
 };
 
 
+class VScale final : public Instr {
+public:
+  VScale(Type &type, std::string &&name)
+    : Instr(type, std::move(name)) {}
+
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
 class UnaryOp final : public Instr {
 public:
   enum Op {
