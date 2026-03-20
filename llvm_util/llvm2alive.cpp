@@ -704,11 +704,12 @@ public:
     return phi;
   }
 
-  RetTy visitBranchInst(llvm::BranchInst &i) {
-    auto &dst_true = getBB(i.getSuccessor(0));
-    if (i.isUnconditional())
-      return make_unique<Branch>(dst_true);
+  RetTy visitUncondBrInst(llvm::UncondBrInst &i) {
+    return make_unique<Branch>(getBB(i.getSuccessor(0)));
+  }
 
+  RetTy visitCondBrInst(llvm::CondBrInst &i) {
+    auto &dst_true = getBB(i.getSuccessor(0));
     auto &dst_false = getBB(i.getSuccessor(1));
     auto cond = get_operand(i.getCondition());
     if (!cond)
