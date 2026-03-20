@@ -4,6 +4,7 @@
 #include "llvm_util/utils.h"
 #include "ir/constant.h"
 #include "ir/function.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -328,10 +329,16 @@ Value* get_operand(llvm::Value *v,
 
   if (auto cnst = dyn_cast<llvm::ConstantFP>(v)) {
     auto &apfloat = cnst->getValueAPF();
-    auto c
-     = make_unique<FloatConst>(*ty,
-                               toString(apfloat.bitcastToAPInt(), 10, false),
-                               true);
+    unique_ptr<FloatConst> c;
+    if (apfloat.isFinite()) {
+      llvm::SmallString<32> str;
+      apfloat.toString(str);
+      c = make_unique<FloatConst>(*ty, string(str), false);
+    } else {
+      c = make_unique<FloatConst>(*ty,
+                                  toString(apfloat.bitcastToAPInt(), 10, false),
+                                  true);
+    }
     auto ret = c.get();
     current_fn->addConstant(std::move(c));
     RETURN_CACHE(ret);
