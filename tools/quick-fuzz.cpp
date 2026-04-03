@@ -844,7 +844,7 @@ void BBFuzzer::go() {
     } break;
     case 1: {
       auto *Dest = BBs[1 + C.choose(NumBBs - 1)];
-      BranchInst::Create(Dest, BBs[i]);
+      UncondBrInst::Create(Dest, BBs[i]);
     } break;
     case 2: {
       auto *Dest1 = BBs[1 + C.choose(NumBBs - 1)];
@@ -861,7 +861,7 @@ void BBFuzzer::go() {
                         : (Value *)ConstantInt::get(IntTy, C.choose(20));
         Cond = new ICmpInst(BBs[i], VG.randomPred(), LHS, RHS);
       }
-      BranchInst::Create(Dest1, Dest2, Cond, BBs[i]);
+      CondBrInst::Create(Cond, Dest1, Dest2, BBs[i]);
     } break;
     case 3: {
       unsigned long NumCases = 1 + C.choose(2 * NumBBs);
