@@ -19,17 +19,19 @@ llvm::cl::list<std::string> opt_funcs(LLVM_ARGS_PREFIX "func",
 set<string> func_names;
 
 #ifdef ARGS_SRC_TGT
-llvm::cl::opt<unsigned> opt_src_unrolling_factor(LLVM_ARGS_PREFIX "src-unroll",
-  llvm::cl::desc("Unrolling factor for src function (default=0)"),
-  llvm::cl::init(0), llvm::cl::cat(alive_cmdargs));
+llvm::cl::list<unsigned> opt_src_unrolling_factor(LLVM_ARGS_PREFIX "src-unroll",
+  llvm::cl::desc("Unrolling factors for src function (default=0)"), 
+  llvm::cl::CommaSeparated,
+  llvm::cl::cat(alive_cmdargs));
 
-llvm::cl::opt<unsigned> opt_tgt_unrolling_factor(LLVM_ARGS_PREFIX "tgt-unroll",
-  llvm::cl::desc("Unrolling factor for tgt function (default=0)"),
-  llvm::cl::init(0), llvm::cl::cat(alive_cmdargs));
+llvm::cl::list<unsigned> opt_tgt_unrolling_factor(LLVM_ARGS_PREFIX "tgt-unroll",
+  llvm::cl::desc("Unrolling factors for tgt function (default=0)"),
+  llvm::cl::CommaSeparated,
+  llvm::cl::cat(alive_cmdargs));
 #else
-llvm::cl::opt<unsigned> opt_unrolling_factor(LLVM_ARGS_PREFIX "unroll",
-  llvm::cl::desc("Unrolling factor (default=0)"),
-  llvm::cl::init(0), llvm::cl::cat(alive_cmdargs));
+  llvm::cl::opt<unsigned> opt_unrolling_factor(LLVM_ARGS_PREFIX "unroll",
+  llvm::cl::desc("Unrolling factor (default=0)"), 
+  llvm::cl::cat(alive_cmdargs));
 #endif
 
 llvm::cl::opt<bool> opt_disable_undef(LLVM_ARGS_PREFIX "disable-undef-input",

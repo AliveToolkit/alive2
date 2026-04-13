@@ -5,6 +5,7 @@
 
 #include <string>
 #include <ostream>
+#include <vector>
 
 namespace util::config {
 
@@ -33,9 +34,9 @@ extern bool debug;
 
 extern bool quiet;
 
-extern unsigned src_unroll_cnt;
+extern std::vector<unsigned> src_unroll_bounds;
 
-extern unsigned tgt_unroll_cnt;
+extern std::vector<unsigned> tgt_unroll_bounds;
 
 // The maximum number of bits to use for offset computations. Note that this may
 // impact correctness, if values involved in offset computations exceed the
