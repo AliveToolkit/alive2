@@ -233,6 +233,18 @@ BasicBlock& Function::insertBBAfter(string_view name, const BasicBlock &bb) {
 
 void Function::removeBB(BasicBlock &BB) {
   assert(BB.getName() != "#sink");
+
+  aggregates.erase(
+    remove_if(aggregates.begin(), aggregates.end(),
+      [&](const auto &agg) {
+        for (auto *v : agg->getVals())
+          for (auto &i : BB.instrs())
+            if (v == &i)
+              return true;
+        return false;
+      }),
+    aggregates.end());
+
   BBs.erase(BB.getName());
 
   for (auto I = BB_order.begin(), E = BB_order.end(); I != E; ++I) {
