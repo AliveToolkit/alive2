@@ -240,7 +240,7 @@ void Function::removeBB(BasicBlock &BB) {
         for (auto *v : agg->getVals())
           for (auto &i : BB.instrs())
             if (v == &i)
-	      return true;
+              return true;
         return false;
       }),
     aggregates.end());
