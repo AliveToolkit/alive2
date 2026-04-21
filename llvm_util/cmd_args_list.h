@@ -64,7 +64,7 @@ llvm::cl::opt<unsigned> opt_smt_to(LLVM_ARGS_PREFIX "smt-to",
   llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<unsigned> opt_smt_max_mem(LLVM_ARGS_PREFIX "smt-max-mem",
-  llvm::cl::desc("AMT max memory (approx)"), llvm::cl::value_desc("MB"),
+  llvm::cl::desc("SMT max memory (approx)"), llvm::cl::value_desc("MB"),
   llvm::cl::init(1024), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<bool> opt_smt_stats(LLVM_ARGS_PREFIX "smt-stats",
