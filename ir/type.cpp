@@ -8,6 +8,8 @@
 #include "util/compiler.h"
 #include <array>
 #include <cassert>
+#include <charconv>
+#include <cstring>
 #include <numeric>
 #include <sstream>
 
@@ -639,7 +641,26 @@ void FloatType::printVal(ostream &os, const State &s, const expr &e) const {
   } else if (f.isInf().isTrue()) {
     os << (f.isFPNegative().isTrue() ? "-oo" : "+oo");
   } else {
-    os << f.float2Real().numeral_string();
+    uint64_t bits = strtoull(e.numeral_string().data(), nullptr, 10);
+    if (fpType == Float) {
+      float fp;
+      memcpy(&fp, &bits, sizeof(fp));
+      char buf[64];
+      auto [p, ec] = to_chars(buf, buf + sizeof(buf), fp,
+                              chars_format::scientific);
+      *p = '\0';
+      os << buf;
+    } else if (fpType == Double) {
+      double fp;
+      memcpy(&fp, &bits, sizeof(fp));
+      char buf[64];
+      auto [p, ec] = to_chars(buf, buf + sizeof(buf), fp,
+                              chars_format::scientific);
+      *p = '\0';
+      os << buf;
+    } else {
+      os << f.float2Real().numeral_string();
+    }
   }
   os << ')';
 }
