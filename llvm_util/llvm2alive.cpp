@@ -1759,6 +1759,28 @@ public:
     return attr;
   }
 
+  static FPDenormalAttrs::Type parse_fp_denormal(llvm::DenormalMode::DenormalModeKind mode) {
+    switch (mode) {
+    case llvm::DenormalMode::IEEE:
+      return FPDenormalAttrs::IEEE;
+    case llvm::DenormalMode::PositiveZero:
+      return FPDenormalAttrs::PositiveZero;
+    case llvm::DenormalMode::PreserveSign:
+      return FPDenormalAttrs::PreserveSign;
+    case llvm::DenormalMode::Dynamic:
+      return FPDenormalAttrs::Dynamic;
+    default:
+      UNREACHABLE();
+    }
+  }
+
+  static FPDenormalAttrs parse_fp_denormal(llvm::DenormalMode mode) {
+    return {
+      .input = parse_fp_denormal(mode.Input),
+      .output = parse_fp_denormal(mode.Output),
+    };
+  }
+
   static void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
     for (const llvm::Attribute &llvmattr : aset) {
       if (llvmattr.isStringAttribute()) {
@@ -1788,6 +1810,13 @@ public:
         attrs.allocsize_0 = args.first;
         if (args.second)
           attrs.allocsize_1 = *args.second;
+        break;
+      }
+      case llvm::Attribute::DenormalFPEnv: {
+        auto fp_env = llvmattr.getDenormalFPEnv();
+        attrs.setFPDenormal(parse_fp_denormal(fp_env.DefaultMode));
+        if (fp_env.F32Mode != fp_env.DefaultMode)
+          attrs.setFPDenormal(parse_fp_denormal(fp_env.F32Mode), 32);
         break;
       }
       case llvm::Attribute::AllocKind: {
