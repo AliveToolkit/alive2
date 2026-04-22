@@ -6,6 +6,7 @@
 #include "util/compiler.h"
 #include <bit>
 #include <cassert>
+#include <charconv>
 #include <cmath>
 // TODO: remove cstring when migrated to std::bit_cast
 #include <cstring>
@@ -66,8 +67,13 @@ static string bits_to_float(Type &type, const string &val) {
   uint64_t num = strtoull(val.c_str(), nullptr, 10);
   TO fp = mbit_cast<TI, TO>(num);
   auto fpclass = fpclassify(fp);
-  return fpclass == FP_NAN || fpclass == FP_SUBNORMAL ? to_hex(type, val)
-                                                      : to_string(fp);
+  if (fpclass == FP_NAN || fpclass == FP_SUBNORMAL)
+    return to_hex(type, val);
+  char buf[64];
+  auto [ptr, ec] = to_chars(buf, buf + sizeof(buf), fp,
+                            chars_format::scientific);
+  *ptr = '\0';
+  return buf;
 }
 
 static string int_to_readable_float(Type &type, const string &val) {
