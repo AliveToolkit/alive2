@@ -171,6 +171,7 @@ endif()
 
 
 if (BUILD_LLVM_UTILS OR BUILD_TV)
+  cmake_policy(SET CMP0075 NEW)
   find_package(LLVM REQUIRED CONFIG)
 
   message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
