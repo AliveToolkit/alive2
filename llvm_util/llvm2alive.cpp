@@ -1739,24 +1739,26 @@ public:
     }
   }
 
-  static FPDenormalAttrs::Type parse_fp_denormal_str(string_view str) {
-    if (str == "dynamic")       return FPDenormalAttrs::Dynamic;
-    if (str == "ieee")          return FPDenormalAttrs::IEEE;
-    if (str == "preserve-sign") return FPDenormalAttrs::PreserveSign;
-    if (str == "positive-zero") return FPDenormalAttrs::PositiveZero;
-    UNREACHABLE();
+  static FPDenormalAttrs::Type parse_fp_denormal(llvm::DenormalMode::DenormalModeKind mode) {
+    switch (mode) {
+    case llvm::DenormalMode::IEEE:
+      return FPDenormalAttrs::IEEE;
+    case llvm::DenormalMode::PositiveZero:
+      return FPDenormalAttrs::PositiveZero;
+    case llvm::DenormalMode::PreserveSign:
+      return FPDenormalAttrs::PreserveSign;
+    case llvm::DenormalMode::Dynamic:
+      return FPDenormalAttrs::Dynamic;
+    default:
+      UNREACHABLE();
+    }
   }
 
-  static FPDenormalAttrs parse_fp_denormal(string_view str) {
-    FPDenormalAttrs attr;
-    auto comma = str.find(',');
-    if (comma == string_view::npos) {
-      attr.input = attr.output = parse_fp_denormal_str(str);
-    } else {
-      attr.output = parse_fp_denormal_str(string_view(str.data(), comma));
-      attr.input  = parse_fp_denormal_str(str.data() + comma + 1);
-    }
-    return attr;
+  static FPDenormalAttrs parse_fp_denormal(llvm::DenormalMode mode) {
+    return {
+      .input = parse_fp_denormal(mode.Input),
+      .output = parse_fp_denormal(mode.Output),
+    };
   }
 
   static void handleFnAttrs(const llvm::AttributeSet &aset, FnAttrs &attrs) {
@@ -1764,11 +1766,7 @@ public:
       if (llvmattr.isStringAttribute()) {
         auto str = llvmattr.getKindAsString();
         auto val = llvmattr.getValueAsString();
-        if (str == "denormal-fp-math") {
-          attrs.setFPDenormal(parse_fp_denormal(val));
-        } else if (str == "denormal-fp-math-f32") {
-          attrs.setFPDenormal(parse_fp_denormal(val), 32);
-        } else if (str == "alloc-family") {
+        if (str == "alloc-family") {
           attrs.allocfamily = val;
         }
       }
@@ -1788,6 +1786,13 @@ public:
         attrs.allocsize_0 = args.first;
         if (args.second)
           attrs.allocsize_1 = *args.second;
+        break;
+      }
+      case llvm::Attribute::DenormalFPEnv: {
+        auto fp_env = llvmattr.getDenormalFPEnv();
+        attrs.setFPDenormal(parse_fp_denormal(fp_env.DefaultMode));
+        if (fp_env.F32Mode != fp_env.DefaultMode)
+          attrs.setFPDenormal(parse_fp_denormal(fp_env.F32Mode), 32);
         break;
       }
       case llvm::Attribute::AllocKind: {
