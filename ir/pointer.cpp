@@ -539,7 +539,9 @@ Pointer::isDereferenceable(const expr &bytes0, uint64_t align,
   expr bytes = bytes0.zextOrTrunc(bits_for_offset);
 
   auto block_constraints = [&](const Pointer &p) {
-    expr ret = p.isBlockAlive();
+    expr ret = expr::mkIf(p.isStackAllocated(),
+                          (iswrite || is_asm) ? p.isBlockAlive() : true,
+                          p.isBlockAlive());
     if (iswrite)
       ret &= p.isWritable() && !p.isNoWrite();
     else if (!ignore_accessability)

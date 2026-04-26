@@ -46,3 +46,5 @@ declare void @llvm.memset.p0i8.i64(ptr captures(none), i8, i64, i32, i1)
 declare void @llvm.memcpy.p0i8.p0i8.i64(ptr captures(none), ptr captures(none) readonly, i64, i32, i1)
 declare void @_Z5PrintRK12ether_header(ptr dereferenceable(12))
 declare void @llvm.lifetime.end(i64, ptr captures(none))
+
+; ERROR: Mismatch in memory
