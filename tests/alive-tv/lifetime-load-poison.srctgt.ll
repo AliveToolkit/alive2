@@ -1,4 +1,4 @@
-; EXPECT: ERROR: Source is more defined than target
+; ERROR: Source is more defined than target
 
 define i8 @src() {
   %p = alloca i8
