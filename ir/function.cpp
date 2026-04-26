@@ -1238,4 +1238,4 @@ void LoopAnalysis::printDot(ostream &os) const {
   os << "}\n";
 }
 
-} 
+}
