@@ -1237,7 +1237,7 @@ Memory::load(const Pointer &ptr, unsigned bytes, set<expr> &undef,
       assert(idx < blk_size);
       uint64_t max_idx = blk_size - bytes + idx;
       expr off = blk_offset + expr::mkUInt(idx, offset);
-      expr is_alive = isBlockAlive(bid, local);
+      expr is_alive = isBlockAlive(expr::mkUInt(bid, Pointer::bitsShortBid()), local);
       loaded[i].first.add(mkIf_fold(is_alive, ::raw_load(blk.val, off, max_idx),
                                     poison),
                           cond);
