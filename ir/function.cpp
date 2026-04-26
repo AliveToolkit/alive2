@@ -608,10 +608,6 @@ void Function::unroll(unsigned k) {
   // computed bottom-up during the post-order traversal below
   unordered_map<BasicBlock*, vector<BasicBlock*>> loop_nodes;
 
-  // grab all value users before duplication so the list is shorter
-  auto users = getUsers();
-  auto phi_preds = getPhiPredecessors(*this);
-
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
     auto [header, height, flag] = worklist.back();
@@ -643,6 +639,12 @@ void Function::unroll(unsigned k) {
         own_loop_bbs.emplace_back(bb);
       }
     }
+
+    // Grab value users before duplicating the current loop so the list stays
+    // shorter. This must be refreshed per loop because unrolling an inner loop
+    // can introduce phis that outer-loop exits now use.
+    auto users = getUsers();
+    auto phi_preds = getPhiPredecessors(*this);
 
     // map: original BB -> {BB} U copies-of-BB
     unordered_map<const BasicBlock*, vector<BasicBlock*>> bbmap;
@@ -1236,5 +1238,4 @@ void LoopAnalysis::printDot(ostream &os) const {
   os << "}\n";
 }
 
-} 
-
+}
