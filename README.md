@@ -76,7 +76,7 @@ Building and Running Translation Validation
 --------
 
 Alive2's `opt` and `clang` translation validation requires a build of LLVM with
-RTTI and exceptions turned on. The latest version of Alive2 is always intended
+RTTI and exceptions turned on. The latest version Of Alive2 is always intended
 to be built against the latest version of LLVM, using the main branch from
 the LLVM repo on Github.
 LLVM can be built in the following way.
@@ -106,6 +106,12 @@ cd ~/alive2/build
 cmake -GNinja -DCMAKE_PREFIX_PATH=~/llvm/build -DBUILD_TV=1 -DCMAKE_BUILD_TYPE=Release ..
 ninja
 ```
+
+Then to validate, and run all tests you can run:
+```
+ninja check
+```
+
 
 Translation validation of one or more LLVM passes transforming an IR file:
 ```
