@@ -31,7 +31,7 @@ llvm::cl::list<unsigned> opt_tgt_unrolling_factor(LLVM_ARGS_PREFIX "tgt-unroll",
 #else
 llvm::cl::opt<unsigned> opt_unrolling_factor(LLVM_ARGS_PREFIX "unroll",
   llvm::cl::desc("Unrolling factor (default=0)"),
-  llvm::cl::cat(alive_cmdargs));
+  llvm::cl::init(0), llvm::cl::cat(alive_cmdargs));
 #endif
 
 llvm::cl::opt<bool> opt_disable_undef(LLVM_ARGS_PREFIX "disable-undef-input",
