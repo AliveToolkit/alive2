@@ -9,9 +9,9 @@
 #include "util/unionfind.h"
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <set>
 #include <unordered_set>
-#include <iostream>
 
 using namespace smt;
 using namespace util;
