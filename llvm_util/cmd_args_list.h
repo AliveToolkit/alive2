@@ -29,8 +29,8 @@ llvm::cl::list<unsigned> opt_tgt_unrolling_factor(LLVM_ARGS_PREFIX "tgt-unroll",
   llvm::cl::CommaSeparated,
   llvm::cl::cat(alive_cmdargs));
 #else
-  llvm::cl::opt<unsigned> opt_unrolling_factor(LLVM_ARGS_PREFIX "unroll",
-  llvm::cl::desc("Unrolling factor (default=0)"), 
+llvm::cl::opt<unsigned> opt_unrolling_factor(LLVM_ARGS_PREFIX "unroll",
+  llvm::cl::desc("Unrolling factor (default=0)"),
   llvm::cl::cat(alive_cmdargs));
 #endif
 
