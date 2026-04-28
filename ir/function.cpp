@@ -9,6 +9,7 @@
 #include "util/unionfind.h"
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <set>
 #include <unordered_set>
 
@@ -587,8 +588,8 @@ static auto getPhiPredecessors(const Function &F) {
   return map;
 }
 
-void Function::unroll(unsigned k) {
-  if (k == 0)
+void Function::unroll(vector<unsigned> unroll_bounds) {
+  if (unroll_bounds.size() == 0)
     return;
 
   LoopAnalysis la(*this);
@@ -607,6 +608,44 @@ void Function::unroll(unsigned k) {
 
   // computed bottom-up during the post-order traversal below
   unordered_map<BasicBlock*, vector<BasicBlock*>> loop_nodes;
+
+  // grab all value users before duplication so the list is shorter
+  auto users = getUsers();
+  auto phi_preds = getPhiPredecessors(*this);
+
+  vector<BasicBlock *> loop_headers_in_order;
+
+  for (auto *bb : BB_order) { // BB_order maintains the code order
+    auto it = forest.find(bb);
+    if (it != forest.end()) {
+      // bb is a loop header
+      loop_headers_in_order.emplace_back(bb);
+    }
+  }
+
+  // check size of loop unroll bounds is valid
+  if (loop_headers_in_order.size() != unroll_bounds.size()) {
+
+    // check if unroll_bounds has only one element, if so, use that for all loop
+    // headers
+    if (unroll_bounds.size() == 1) {
+      unsigned bound = unroll_bounds.front();
+      unroll_bounds.clear();
+      unroll_bounds.resize(loop_headers_in_order.size(), bound);
+    } else {
+        std::cerr << "Error: Number of loop headers does not match number of unroll bounds.\n"
+          << "Number of loop headers: " << loop_headers_in_order.size() << "\n"
+          << "Number of unroll bounds: " << unroll_bounds.size() << std::endl;
+        exit(1);
+    }
+  }
+
+  // map loop header -> unroll bound
+  unordered_map<BasicBlock *, unsigned> unroll_bound_map;
+  for (size_t i = 0; i < loop_headers_in_order.size(); ++i) {
+    auto *header = loop_headers_in_order[i];
+    unroll_bound_map[header] = unroll_bounds[i];
+  }
 
   // traverse each loop tree in post-order
   while (!worklist.empty()) {
@@ -672,13 +711,17 @@ void Function::unroll(unsigned k) {
     for (unsigned i = 0; i < height; ++i) {
       name_prefix += "#1";
     }
-    for (unsigned unroll = 2; unroll <= k; ++unroll) {
+    for (unsigned unroll = 2; unroll <= unroll_bound_map[header]; ++unroll) {
       string suffix = name_prefix + '#' + to_string(unroll);
       for (auto *bb : loop_bbs) {
         auto &copies = bbmap.at(bb);
         copies.emplace_back(&cloneBB(*this, *bb, suffix.c_str(), bbmap, vmap));
         unrolled_bbs.emplace_back(copies.back());
       }
+    }
+
+    if (unroll_bounds.size() > 1) {
+      unroll_bounds.erase(unroll_bounds.begin());
     }
 
     // Clone the header once more so that the last iteration of the loop can

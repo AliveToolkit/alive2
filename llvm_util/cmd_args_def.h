@@ -2,11 +2,11 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #ifdef ARGS_SRC_TGT
-config::src_unroll_cnt = opt_src_unrolling_factor;
-config::tgt_unroll_cnt = opt_tgt_unrolling_factor;
+config::src_unroll_bounds = std::vector<unsigned>(opt_src_unrolling_factor.begin(), opt_src_unrolling_factor.end());
+config::tgt_unroll_bounds = std::vector<unsigned>(opt_tgt_unrolling_factor.begin(), opt_tgt_unrolling_factor.end());
 #else
-config::src_unroll_cnt = opt_unrolling_factor;
-config::tgt_unroll_cnt = opt_unrolling_factor;
+config::src_unroll_bounds = std::vector<unsigned>({opt_unrolling_factor});
+config::tgt_unroll_bounds = std::vector<unsigned>({opt_unrolling_factor});
 #endif
 config::disable_undef_input = opt_disable_undef;
 config::disable_poison_input = opt_disable_poison;
