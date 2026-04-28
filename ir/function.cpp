@@ -702,8 +702,7 @@ void Function::unroll(vector<unsigned> unroll_bounds) {
       }
     }
 
-    if (unroll_bounds.size()>1)
-    {
+    if (unroll_bounds.size() > 1) {
       unroll_bounds.erase(unroll_bounds.begin());
     }
 
