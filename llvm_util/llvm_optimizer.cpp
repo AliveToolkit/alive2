@@ -56,10 +56,6 @@ string optimize_module(llvm::Module &M, string_view optArgs) {
     MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O1);
   } else if (optArgs == "O0") {
     MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::O0);
-  } else if (optArgs == "Os") {
-    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::Os);
-  } else if (optArgs == "Oz") {
-    MPM = PB.buildPerModuleDefaultPipeline(OptimizationLevel::Oz);
   } else {
     if (auto Err = PB.parsePassPipeline(MPM, optArgs))
       return toString(std::move(Err));
@@ -68,4 +64,4 @@ string optimize_module(llvm::Module &M, string_view optArgs) {
   return {};
 }
 
-}
+} // namespace llvm_util
