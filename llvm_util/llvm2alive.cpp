@@ -2,6 +2,7 @@
 // Distributed under the MIT license that can be found in the LICENSE file.
 
 #include "llvm_util/llvm2alive.h"
+#include "ir/type.h"
 #include "ir/x86_intrinsics.h"
 #include "llvm_util/known_fns.h"
 #include "llvm_util/utils.h"
@@ -1225,6 +1226,12 @@ public:
       addNoundefAssumes(i, {a, b});
       return make_unique<VaCopy>(*a, *b);
     }
+    case llvm::Intrinsic::vscale: {
+      auto ty = llvm_type2alive(i.getType());
+      if (!ty)
+        return error(i);
+      return make_unique<VScale>(*ty, value_name(i));
+    }
 
     // do nothing intrinsics
     case llvm::Intrinsic::dbg_declare:
@@ -1336,8 +1343,17 @@ public:
   RetTy visitShuffleVectorInst(llvm::ShuffleVectorInst &i) {
     PARSE_BINOP();
     vector<unsigned> mask;
-    for (auto m : i.getShuffleMask())
-      mask.push_back(m);
+
+    unsigned replicate = 1;
+    if (i.getType()->isScalableTy()) {
+      replicate = config::vscale_value;
+    }
+
+    auto &&sm = i.getShuffleMask();
+    for (unsigned j = 0; j < replicate; j++) {
+      mask.insert(mask.end(), sm.begin(), sm.end());
+    }
+
     return
       make_unique<ShuffleVector>(*ty, value_name(i), *a, *b, std::move(mask));
   }
