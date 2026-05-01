@@ -1463,6 +1463,7 @@ public:
       case LLVMContext::MD_nosanitize:
       case LLVMContext::MD_prof:
       case LLVMContext::MD_unpredictable:
+      case LLVMContext::MD_tbaa:
         break;
 
       default:
