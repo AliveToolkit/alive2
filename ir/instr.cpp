@@ -755,6 +755,8 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
                             bool flags_in_only = false,
                             const Type *to_ty = nullptr, int nary = 3) {
   AndExpr non_poison;
+  expr fp_a, fp_b, fp_c;
+
   non_poison.add(ap);
   if (nary >= 2)
     non_poison.add(bp);
@@ -768,22 +770,25 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
 
   if (fmath.flags & FastMathFlags::NSZ) {
     a = any_fp_zero(s, std::move(a));
-    if (nary >= 2) {
+    if (nary >= 2)
       b = any_fp_zero(s, std::move(b));
-      if (nary == 3)
-        c = any_fp_zero(s, std::move(c));
-    }
+    if (nary >= 3)
+      c = any_fp_zero(s, std::move(c));
   }
 
-  expr fp_a = fpty.getFloat(a);
-  expr fp_b = fpty.getFloat(b);
-  expr fp_c = fpty.getFloat(c);
+  fp_a = fpty.getFloat(a);
+  if (nary >= 2)
+    fp_b = fpty.getFloat(b);
+  if (nary >= 3)
+    fp_c = fpty.getFloat(c);
 
   if (!bitwise) {
     auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(from_ty).input;
     fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a));
-    fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b));
-    fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c));
+    if (nary >= 2)
+      fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b));
+    if (nary >= 3)
+      fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c));
   }
 
   function<expr(const expr&)> fn_rm
