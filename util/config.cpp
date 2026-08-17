@@ -3,6 +3,7 @@
 
 #include "util/config.h"
 #include <iostream>
+#include <vector>
 
 using namespace std;
 
@@ -20,8 +21,8 @@ bool fail_if_src_is_ub = false;
 bool disallow_ub_exploitation = false;
 bool debug = false;
 bool quiet = false;
-unsigned src_unroll_cnt = 0;
-unsigned tgt_unroll_cnt = 0;
+std::vector<unsigned> src_unroll_bounds;
+std::vector<unsigned> tgt_unroll_bounds;
 unsigned max_offset_bits = 64;
 unsigned max_sizet_bits = 64;
 

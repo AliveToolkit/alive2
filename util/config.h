@@ -3,8 +3,9 @@
 // Copyright (c) 2018-present The Alive2 Authors.
 // Distributed under the MIT license that can be found in the LICENSE file.
 
-#include <string>
 #include <ostream>
+#include <string>
+#include <vector>
 
 namespace util::config {
 
@@ -33,9 +34,9 @@ extern bool debug;
 
 extern bool quiet;
 
-extern unsigned src_unroll_cnt;
+extern std::vector<unsigned> src_unroll_bounds;
 
-extern unsigned tgt_unroll_cnt;
+extern std::vector<unsigned> tgt_unroll_bounds;
 
 // The maximum number of bits to use for offset computations. Note that this may
 // impact correctness, if values involved in offset computations exceed the

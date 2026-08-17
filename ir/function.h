@@ -224,7 +224,7 @@ public:
                          const std::vector<std::string_view> &src_glbs);
 
   void topSort();
-  void unroll(unsigned k);
+  void unroll(std::vector<unsigned> unroll_bounds);
 
   void print(std::ostream &os, bool print_header = true) const;
   friend std::ostream &operator<<(std::ostream &os, const Function &f);

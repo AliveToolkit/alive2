@@ -1976,8 +1976,8 @@ void Transform::preprocess() {
   // bits_program_pointer is used by unroll. Initialize it in advance
   initBitsProgramPointer(*this);
 
-  src.unroll(config::src_unroll_cnt);
-  tgt.unroll(config::tgt_unroll_cnt);
+  src.unroll(config::src_unroll_bounds);
+  tgt.unroll(config::tgt_unroll_bounds);
 }
 
 void Transform::print(ostream &os, const TransformPrintOpts &opt) const {
