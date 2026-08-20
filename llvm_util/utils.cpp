@@ -349,7 +349,14 @@ Value* get_operand(llvm::Value *v,
   }
 
   if (isa<llvm::ConstantPointerNull>(v)) {
-    auto val = make_unique<NullPointerValue>(*ty);
+    std::unique_ptr<Value> val = make_unique<NullPointerValue>(
+        *llvm_type2alive(v->getType()->getScalarType()));
+    if (auto vty = dyn_cast<llvm::FixedVectorType>(v->getType())) {
+      Value *splat = val.get();
+      current_fn->addConstant(std::move(val));
+      vector<Value *> vals(vty->getNumElements(), splat);
+      val = make_unique<AggregateValue>(*ty, std::move(vals));
+    }
     auto ret = val.get();
     current_fn->addConstant(std::move(val));
     RETURN_CACHE(ret);
