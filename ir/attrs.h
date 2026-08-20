@@ -71,6 +71,7 @@ public:
                    ZeroExt = 1<<13, SignExt = 1<<14, InReg = 1<<15,
                    NoFPClass = 1<<16, DeadOnUnwind = 1<<17,
                    Writable = 1<<18, DeadOnReturn = 1<<19,
+                   NoFree = 1<<20, NoFreeObj = 1<<21,
                    IsArg = 1<<31 // used internally to make values as arguments
                   };
 
@@ -136,7 +137,8 @@ public:
                    DereferenceableOrNull = 1 << 10,
                    NullPointerIsValid = 1 << 11,
                    AllocSize = 1 << 12, ZeroExt = 1<<13,
-                   SignExt = 1<<14, NoFPClass = 1<<15, Asm = 1<<16 };
+                   SignExt = 1<<14, NoFPClass = 1<<15, Asm = 1<<16,
+                   NoFreeObj = 1<<17 };
 
   FnAttrs(unsigned bits = None) : bits(bits) {}
 

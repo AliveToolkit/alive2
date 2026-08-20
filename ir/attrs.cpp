@@ -63,6 +63,10 @@ ostream& operator<<(ostream &os, const ParamAttrs &attr) {
   }
   if (attr.has(ParamAttrs::Writable))
     os << "writable ";
+  if (attr.has(ParamAttrs::NoFree))
+    os << "nofree ";
+  if (attr.has(ParamAttrs::NoFreeObj))
+    os << "nofreeobj ";
   if (!attr.initializes.empty()) {
     os << "initializes(";
     bool first = true;
@@ -160,6 +164,8 @@ ostream& operator<<(ostream &os, const FnAttrs &attr) {
     attr.fp_denormal32->print(os, true);
   if (attr.has(FnAttrs::Asm))
     os << " asm";
+  if (attr.has(FnAttrs::NoFreeObj))
+    os << " nofreeobj";
   return os << attr.mem;
 }
 
