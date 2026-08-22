@@ -28,7 +28,9 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 using namespace tools;
 using namespace util;
@@ -143,6 +145,9 @@ and "tgt5" will unused.
   verifier.bidirectional = opt_bidirectional;
 
   unique_ptr<llvm::Module> M2;
+  unordered_map<string, llvm::Function *> M2_funcs;
+  vector<llvm::Function *> M2_anon_funcs;
+
   if (opt_file2.empty()) {
     unsigned Cnt = 0;
     for (auto &F1 : *M1.get()) {
@@ -210,8 +215,15 @@ and "tgt5" will unused.
     return -1;
   }
 
-  // FIXME: quadratic, may not be suitable for very large modules
-  // emitted by opt-fuzz
+  for (auto &F2 : *M2.get()) {
+    if (F2.isDeclaration())
+      continue;
+    if (F2.getName().empty())
+      M2_anon_funcs.push_back(&F2);
+    else
+      M2_funcs.emplace(F2.getName().str(), &F2);
+  }
+
   for (auto &F1 : *M1.get()) {
     if (F1.isDeclaration())
       continue;
@@ -219,20 +231,21 @@ and "tgt5" will unused.
       M1_anon_count++;
     if (!func_names.empty() && !func_names.count(F1.getName().str()))
       continue;
-    unsigned M2_anon_count = 0;
-    for (auto &F2 : *M2.get()) {
-      if (F2.isDeclaration())
+
+    llvm::Function *F2;
+    if (F1.getName().empty()) {
+      if (M1_anon_count > M2_anon_funcs.size())
         continue;
-      if (F2.getName().empty())
-        M2_anon_count++;
-      if ((F1.getName().empty() && (M1_anon_count == M2_anon_count)) ||
-          (F1.getName() == F2.getName())) {
-        if (!verifier.compareFunctions(F1, F2))
-          if (opt_error_fatal)
-            goto end;
-        break;
-      }
+      F2 = M2_anon_funcs[M1_anon_count - 1];
+    } else {
+      auto I = M2_funcs.find(F1.getName().str());
+      if (I == M2_funcs.end())
+        continue;
+      F2 = I->second;
     }
+    if (!verifier.compareFunctions(F1, *F2))
+      if (opt_error_fatal)
+        goto end;
   }
 summary:
   *out << "Summary:\n"
