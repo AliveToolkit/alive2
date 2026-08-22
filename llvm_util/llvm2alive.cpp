@@ -1696,6 +1696,14 @@ public:
         ranges::sort(attrs.initializes);
         break;
 
+      case llvm::Attribute::NoFree:
+        attrs.set(ParamAttrs::NoFree);
+        break;
+
+      case llvm::Attribute::NoFreeObj:
+        attrs.set(ParamAttrs::NoFreeObj);
+        break;
+
       default:
         // If it is call site, it should be added at approximation list
         if (!is_callsite)
