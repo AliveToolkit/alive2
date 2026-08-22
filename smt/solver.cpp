@@ -229,6 +229,7 @@ public:
     }
   }
 
+#if 0
   template <typename T1, typename T2>
   void appendIf(const char *probe, T1 &&then, T2 &&els) {
     IfTactic t(probe, make_unique<T1>(std::move(then)),
@@ -237,6 +238,7 @@ public:
     if (tactic_verbose)
       tactics.emplace_back(make_unique<IfTactic>(std::move(t)));
   }
+#endif
 
   TacticResult exec(const Goal &goal0) const override {
     Goal goal(goal0);
@@ -270,10 +272,12 @@ class TopLevelTactic {
 public:
   TopLevelTactic(initializer_list<const char*> ts) : tactics(std::move(ts)) {}
 
+#if 0
   template <typename T1, typename T2>
   void appendIf(const char *probe, T1 &&then, T2 &&els) {
     tactics.appendIf(probe, std::move(then), std::move(els));
   }
+#endif
 
   void add(Z3_ast ast) { goal.add(ast); }
   void reset_solver()  { goal.reset(); }
