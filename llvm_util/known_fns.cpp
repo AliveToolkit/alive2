@@ -506,8 +506,8 @@ namespace llvm_util {
 bool llvm_implict_attrs(llvm::Function &f, const llvm::TargetLibraryInfo &TLI,
                         FnAttrs &attrs, vector<ParamAttrs> &param_attrs,
                         const vector<Value*> &args) {
-  llvm::LibFunc libfn;
-  if (!TLI.getLibFunc(f, libfn) || !TLI.has(libfn))
+  llvm::LibFunc libfn = TLI.getLibFunc(f);
+  if (!TLI.has(libfn))
     return false;
   return implict_attrs_(libfn, attrs, param_attrs,
                         f.getReturnType()->isVoidTy(), args);
@@ -530,8 +530,11 @@ known_call(llvm::CallInst &i, const llvm::TargetLibraryInfo &TLI,
     RETURN_EXACT();
 
   auto decl = i.getCalledFunction();
-  llvm::LibFunc libfn;
-  if (!decl || !TLI.getLibFunc(*decl, libfn))
+  if (!decl)
+    RETURN_EXACT();
+
+  llvm::LibFunc libfn = TLI.getLibFunc(*decl);
+  if (libfn == llvm::NotLibFunc)
     RETURN_EXACT();
 
   auto tci = parse_fn_tailcall(i);
