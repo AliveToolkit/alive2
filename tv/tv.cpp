@@ -466,22 +466,21 @@ llvm::RegisterPass<TVLegacyPass> X("tv", "Translation Validator", false, false);
 
 // Extracting Module out of IR unit.
 // Excerpted from LLVM's StandardInstrumentation.cpp
-const llvm::Module * unwrapModule(llvm::Any IR) {
+const llvm::Module *unwrapModule(llvm::IRUnitRef IR) {
   using namespace llvm;
 
-  if (auto **M = any_cast<const Module *>(&IR))
-    return *M;
-  else if (auto **F = any_cast<const llvm::Function *>(&IR))
-    return (*F)->getParent();
-  else if (auto **C = any_cast<const LazyCallGraph::SCC *>(&IR)) {
-    assert((*C)->begin() != (*C)->end()); // there's at least one function
-    return (*C)->begin()->getFunction().getParent();
-  } else if (auto **L = any_cast<const Loop *>(&IR))
-    return (*L)->getHeader()->getParent()->getParent();
+  if (auto *M = dyn_cast<Module>(IR))
+    return M;
+  else if (auto *F = dyn_cast<llvm::Function>(IR))
+    return F->getParent();
+  else if (auto *C = dyn_cast<LazyCallGraph::SCC>(IR)) {
+    assert(C->begin() != C->end()); // there's at least one function
+    return C->begin()->getFunction().getParent();
+  } else if (auto *L = dyn_cast<Loop>(IR))
+    return L->getHeader()->getParent()->getParent();
 
   llvm_unreachable("Unknown IR unit");
 }
-
 
 // List 'leaf' interprocedural passes only.
 // For example, ModuleInlinerWrapperPass shouldn't be here because it is an
@@ -733,7 +732,7 @@ llvmGetPassPluginInfo() {
       if (batch_opts) {
         // For batched clang tv, manually run TVPass before each pass
         instrument->registerBeforeNonSkippedPassCallback(
-              [](llvm::StringRef P, llvm::Any IR) {
+            [](llvm::StringRef P, llvm::IRUnitRef IR) {
           assert(is_clangtv && "Batching is enabled for clang-tv only");
           if (is_clangtv_done)
             return;
@@ -758,21 +757,22 @@ llvmGetPassPluginInfo() {
           if (is_first || do_start || do_finish)
             runTVPass(*const_cast<llvm::Module *>(unwrapModule(IR)));
         });
-        instrument->registerAfterPassCallback([&](
-            llvm::StringRef P, llvm::Any, const llvm::PreservedAnalyses &) {
+        instrument->registerAfterPassCallback(
+            [&](llvm::StringRef P, llvm::IRUnitRef,
+                const llvm::PreservedAnalyses &) {
           TVPass::batched_pass_count++;
           pass_name = P.str();
         });
 
       } else {
-        auto fn = [](llvm::StringRef P, llvm::Any IR) {
+        auto fn = [](llvm::StringRef P, llvm::IRUnitRef IR) {
           pass_name = P.str();
           if (is_clangtv && !is_clangtv_done) {
-            if (auto **F = any_cast<const llvm::Function *>(&IR)) {
-              runTVPass(*const_cast<llvm::Function*>(*F));
-            } else if (auto **L = any_cast<const llvm::Loop *>(&IR)) {
-              runTVPass(*const_cast<llvm::Function*>((*L)->getHeader()
-                                                         ->getParent()));
+            if (auto *F = dyn_cast<llvm::Function>(IR)) {
+              runTVPass(*const_cast<llvm::Function *>(F));
+            } else if (auto *L = dyn_cast<llvm::Loop>(IR)) {
+              runTVPass(
+                  *const_cast<llvm::Function *>(L->getHeader()->getParent()));
             } else {
               auto *M = unwrapModule(IR);
               saveBitcode(M);
@@ -786,7 +786,7 @@ llvmGetPassPluginInfo() {
         // This varies per LLVM version!
         instrument->registerBeforeNonSkippedPassCallback(fn);
         instrument->registerAfterPassCallback(
-          [fn](llvm::StringRef P, llvm::Any IR,
+          [fn](llvm::StringRef P, llvm::IRUnitRef IR,
              const llvm::PreservedAnalyses &PA) {
             return fn(P, IR);
         });
