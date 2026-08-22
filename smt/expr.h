@@ -423,7 +423,7 @@ public:
       [&]() -> decltype(auto) { return b; })
 
 template <typename RetTy, typename T1, typename T2>
-static RetTy mkIf_fold_fn(const expr &cond, T1 &&a, T2 &&b) {
+static inline RetTy mkIf_fold_fn(const expr &cond, T1 &&a, T2 &&b) {
   if (cond.isTrue())
     return a();
   if (cond.isFalse())
