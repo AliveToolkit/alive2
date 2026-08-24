@@ -1169,6 +1169,9 @@ static void calculateAndInitConstants(Transform &t) {
               fn->getGlobalVar(string_view(call->getFnName()).substr(1)) &&
               inaccessiblememonly_fns.emplace(call->getName()).second)
             ++num_inaccessiblememonly_fns;
+        } else {
+          if (inaccessiblememonly_fns.emplace(call->getName()).second)
+            ++num_inaccessiblememonly_fns;
         }
         if (call->isIndirect()) {
           has_indirect_fncalls = true;
