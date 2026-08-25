@@ -6,6 +6,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <cassert>
 #include <charconv>
@@ -1110,12 +1111,26 @@ void ArrayType::print(ostream &os) const {
 }
 
 
-VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(std::move(name), false) {
-  assert(elements != 0);
-  this->elements = elements;
+expr VectorType::getVScaleVar() {
+  return expr::mkVar("vscale", var_vector_elements);
+}
+
+expr VectorType::vscale() const {
+  if (!scalable)
+    return expr::mkUInt(1, var_vector_elements);
+  return defined ? expr::mkUInt(vscale_value, var_vector_elements)
+                 : getVScaleVar();
+}
+
+VectorType::VectorType(string &&name, unsigned elems, Type &elTy, bool scal)
+  : AggregateType(std::move(name), false), scalable(scal), min_elements(elems),
+    vscale_value(scal ? util::config::vscale_value : 1) {
+  assert(elems != 0);
+  if (scalable)
+    elems *= vscale_value;
+  this->elements = elems;
   defined = true;
-  children.resize(elements, &elementTy);
+  children.resize(elements, &elTy);
   is_padding.resize(elements, false);
 }
 
@@ -1178,6 +1193,12 @@ expr VectorType::getTypeConstraints() const {
     r &= numElements().ugt(i).implies(elementTy == *children[i]);
   }
 
+  if (scalable && defined) {
+    r &= vscale() == expr::mkUInt(vscale_value, var_vector_elements);
+  } else if (scalable) {
+    r &= vscale().uge(expr::mkUInt(1, var_vector_elements));
+  }
+
   return r;
 }
 
@@ -1193,14 +1214,25 @@ bool VectorType::isVectorType() const {
   return true;
 }
 
+void VectorType::fixup(const Model &m) {
+  if (!defined && scalable)
+    vscale_value = m.getUInt(vscale());
+  AggregateType::fixup(m);
+}
+
 expr VectorType::enforceVectorType(
     const function<expr(const Type&)> &enforceElem) const {
   return enforceElem(*children[0]);
 }
 
 void VectorType::print(ostream &os) const {
-  if (elements)
-    os << '<' << elements << " x " << *children[0] << '>';
+  if (!elements)
+    return;
+  os << '<';
+  if (scalable) {
+    os << "vscale" << ":" << vscale_value << " x ";
+  }
+  os << min_elements << " x " << *children[0] << '>';
 }
 
 

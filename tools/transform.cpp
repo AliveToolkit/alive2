@@ -4,6 +4,7 @@
 #include "tools/transform.h"
 #include "ir/globals.h"
 #include "ir/state.h"
+#include "ir/type.h"
 #include "smt/expr.h"
 #include "smt/smt.h"
 #include "smt/solver.h"
@@ -1397,6 +1398,12 @@ pair<unique_ptr<State>, unique_ptr<State>> TransformVerify::exec() const {
 
   auto src_state = make_unique<State>(t.src, true);
   auto tgt_state = make_unique<State>(t.tgt, false);
+
+  if (config::vscale_value) {
+    auto vs = VectorType::getVScaleVar();
+    src_state->addPre(vs == expr::mkUInt(config::vscale_value, vs));
+  }
+
   sym_exec(*src_state);
   tgt_state->syncSEdataWithSrc(*src_state);
   src_state->cleanup();
