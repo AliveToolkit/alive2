@@ -782,6 +782,16 @@ check_refinement(Errors &errs, const Transform &t, State &src_state,
                                         : value_cnstr && memory_cnstr0),
         "memory", print_ptr_load, "Mismatch in memory");
 
+  value_cnstr = expr();
+  memory_cnstr0 = expr();
+
+  // 7. Check errno
+  auto errno_cnstr = src_state.getReturnErrno() == tgt_state.getReturnErrno();
+  CHECK(dom && !errno_cnstr, "errno",
+        [](ostream &s, const Model &m) {
+          s << "\nErrno values do not match at return";
+        }, "Mismatch in errno at return");
+
 #undef CHECK
 }
 
