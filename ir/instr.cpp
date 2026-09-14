@@ -849,10 +849,13 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   }
 
   if (!bitwise && val.isFloat()) {
-    val = handle_subnormal(s,
-                           s.getFn().getFnAttrs().getFPDenormal(from_ty).output,
-                           std::move(val));
     const FloatType &ty = to_ty ? *to_ty->getAsFloatType() : fpty;
+    // the denormal mode is per-type, so the flushing of the result is governed
+    // by the mode of the result's type rather than that of the operands; these
+    // differ for casts between floating-point types
+    val = handle_subnormal(s,
+                           s.getFn().getFnAttrs().getFPDenormal(ty).output,
+                           std::move(val));
     val = ty.fromFloat(s, val, fpty, nary, a, b, c);
   }
 
