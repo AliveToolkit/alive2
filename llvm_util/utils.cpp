@@ -159,6 +159,11 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     if (strty->isOpaque())
       return get_int_type(8);
 
+    // If there's a scalable struct member, return early since
+    // otherwise getStructLayout() will assert out
+    if (strty->isScalableTy())
+      return nullptr;
+
     auto &cache = type_cache[ty];
     if (!cache) {
       vector<Type*> elems;
