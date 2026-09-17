@@ -1574,6 +1574,10 @@ public:
                         Value **val, bool is_callsite) {
     bool precise = true;
     for (const llvm::Attribute &llvmattr : aset) {
+      if (!llvmattr.isEnumAttribute() && !llvmattr.isIntAttribute() &&
+          !llvmattr.isTypeAttribute())
+        continue;
+
       switch (llvmattr.getKindAsEnum()) {
       case llvm::Attribute::InReg:
         attrs.set(ParamAttrs::InReg);
