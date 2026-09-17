@@ -843,7 +843,9 @@ public:
     case llvm::Intrinsic::scmp:
     case llvm::Intrinsic::clmul:
     case llvm::Intrinsic::pext:
-    case llvm::Intrinsic::pdep: {
+    case llvm::Intrinsic::pdep:
+    case llvm::Intrinsic::umulh:
+    case llvm::Intrinsic::smulh: {
       PARSE_BINOP();
       addNoundefAssumes(i, {a, b});
       BinOp::Op op;
@@ -872,6 +874,8 @@ public:
       case llvm::Intrinsic::clmul:    op = BinOp::Clmul; break;
       case llvm::Intrinsic::pext:     op = BinOp::PExt; break;
       case llvm::Intrinsic::pdep:     op = BinOp::PDep; break;
+      case llvm::Intrinsic::umulh:    op = BinOp::UMulH; break;
+      case llvm::Intrinsic::smulh:    op = BinOp::SMulH; break;
       default: UNREACHABLE();
       }
       ret = make_unique<BinOp>(*ty, value_name(i), *a, *b, op);

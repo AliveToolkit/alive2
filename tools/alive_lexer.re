@@ -289,6 +289,8 @@ space+ {
 "clmul" { return CLMUL; }
 "pext" { return PEXT; }
 "pdep" { return PDEP; }
+"umulh" { return UMULH; }
+"smulh" { return SMULH; }
 "oeq" { return OEQ; }
 "ogt" { return OGT; }
 "oge" { return OGE; }

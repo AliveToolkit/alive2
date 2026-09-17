@@ -1,0 +1,29 @@
+Name: umulh constant1
+%r = umulh i4 1, i4 2
+  =>
+%r = 0
+
+Name: umulh constant2
+%r = umulh i4 5, i4 6
+  =>
+%r = 1
+
+Name: umulh constant2
+%r = umulh i4 4, i4 10
+  =>
+%r = 2
+
+Name: smulh constant1
+%r = smulh i4 1, i4 2
+  =>
+%r = 0
+
+Name: smulh constant2
+%r = smulh i4 5, i4 6
+  =>
+%r = 1
+
+Name: smulh constant2
+%r = smulh i4 4, i4 10
+  =>
+%r = -2

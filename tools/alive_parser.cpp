@@ -713,6 +713,8 @@ static unsigned parse_binop_flags(token op_token) {
   case CLMUL:
   case PEXT:
   case PDEP:
+  case UMULH:
+  case SMULH:
     return BinOp::None;
   default:
     UNREACHABLE();
@@ -788,6 +790,8 @@ static unique_ptr<Instr> parse_binop(string_view name, token op_token) {
   case CLMUL: op = BinOp::Clmul; break;
   case PEXT: op = BinOp::PExt; break;
   case PDEP: op = BinOp::PDep; break;
+  case UMULH: op = BinOp::UMulH; break;
+  case SMULH: op = BinOp::SMulH; break;
   default:
     UNREACHABLE();
   }
@@ -1282,6 +1286,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case CLMUL:
   case PEXT:
   case PDEP:
+  case UMULH:
+  case SMULH:
     return parse_binop(name, t);
   case FADD:
   case FSUB:
