@@ -46,6 +46,9 @@ extern unsigned max_offset_bits;
 // size and size of pointers (not to be confused with program pointer size).
 extern unsigned max_sizet_bits;
 
+// The vscale value for scalable vectors.
+extern unsigned vscale_value;
+
 std::ostream &dbg();
 void set_debug(std::ostream &os);
 

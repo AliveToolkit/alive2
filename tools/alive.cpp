@@ -36,6 +36,7 @@ static void show_help() {
           " -skip-smt\t\tSkip all SMT queries\n"
           " -disable-poison-input\tAssume input variables can never be poison\n"
           " -disable-undef-input\tAssume input variables can never be undef\n"
+          " -vscale:x\t\tSet vscale value for scalable vectors (default: 1)\n"
           " -h / --help / -v / --version\tShow this help\n";
 }
 
@@ -76,6 +77,8 @@ int main(int argc, char **argv) {
       config::disable_undef_input = true;
     else if (arg == "-disable-poison-input")
       config::disable_poison_input = true;
+    else if (arg.compare(0, 8, "-vscale:") == 0 && arg.size() > 8)
+      config::vscale_value = strtoul(arg.substr(8).data(), nullptr, 10);
     else if (arg == "-h" || arg == "--help" || arg == "-v" ||
              arg == "--version") {
       show_help();
