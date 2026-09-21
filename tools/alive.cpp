@@ -119,7 +119,8 @@ int main(int argc, char **argv) {
         TransformVerify tv(t, !root_only);
         auto types = tv.getTypings();
         if (!types) {
-          cerr << "Doesn't type check!\n";
+          cerr << (types.hasError() ? "Could not solve typing constraints\n"
+                                    : "Doesn't type check!\n");
           continue;
         }
 
@@ -135,6 +136,10 @@ int main(int argc, char **argv) {
             break;
           }
           cout << "\rDone: " << ++i << flush;
+        }
+        if (types.hasError()) {
+          cerr << "Could not solve typing constraints\n";
+          correct = false;
         }
         cout << '\n';
         if (correct)

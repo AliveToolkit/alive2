@@ -45,6 +45,9 @@ public:
   operator bool() const;
   void operator++(void);
   bool hasSingleTyping() const { return has_only_one_solution; }
+  bool hasError() const {
+    return !has_only_one_solution && !r.isSat() && !r.isUnsat();
+  }
 
   friend class TransformVerify;
 };
