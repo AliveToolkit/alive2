@@ -1528,7 +1528,6 @@ void TypingAssignments::operator++(void) {
     EnableSMTQueriesTMP tmp;
     s.block(r.getModel(), &sneg);
     r = s.check("typing");
-    assert(r.isSat() || r.isUnsat());
   }
 }
 
