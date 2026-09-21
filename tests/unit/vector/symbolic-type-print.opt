@@ -1,0 +1,10 @@
+; ERROR: Value mismatch for i4 %r
+; CHECK: <4 x i4> %vec =
+; CHECK: <4 x i4> %v =
+
+; A defined value at index 3 requires all four supported symbolic lanes.
+Name: symbolic vector counterexample type
+%v = insertelement %vec, i4 %x, i32 3
+%r = extractelement %v, i32 3
+=>
+%r = i4 0
