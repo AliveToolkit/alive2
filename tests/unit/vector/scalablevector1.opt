@@ -1,0 +1,76 @@
+Name: scalable vector add - identity
+%r = add <vscale x 2 x i4> %a, %b
+  =>
+%r = add <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector add - commutative
+%r = add <vscale x 2 x i4> %a, %b
+  =>
+%r = add <vscale x 2 x i4> %b, %a
+
+
+Name: scalable vector mul - identity
+%r = mul <vscale x 2 x i4> %a, %b
+  =>
+%r = mul <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector mul - commutative
+%r = mul <vscale x 2 x i4> %a, %b
+  =>
+%r = mul <vscale x 2 x i4> %b, %a
+
+
+Name: scalable vector extract - identity
+%r = extractelement <vscale x 2 x i4> %vec, i32 %idx
+  =>
+%r = extractelement <vscale x 2 x i4> %vec, i32 %idx
+
+
+Name: scalable vector insert - identity
+%r = insertelement <vscale x 2 x i4> %vec, i4 %val, i32 %idx
+  =>
+%r = insertelement <vscale x 2 x i4> %vec, i4 %val, i32 %idx
+
+
+Name: scalable vector sub - identity
+%r = sub <vscale x 2 x i4> %a, %b
+  =>
+%r = sub <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector and - identity
+%r = and <vscale x 2 x i4> %a, %b
+  =>
+%r = and <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector or - identity
+%r = or <vscale x 2 x i4> %a, %b
+  =>
+%r = or <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector xor - identity
+%r = xor <vscale x 2 x i4> %a, %b
+  =>
+%r = xor <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector shl - identity
+%r = shl <vscale x 2 x i4> %a, %b
+  =>
+%r = shl <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector lshr - identity
+%r = lshr <vscale x 2 x i4> %a, %b
+  =>
+%r = lshr <vscale x 2 x i4> %a, %b
+
+
+Name: scalable vector ashr - identity
+%r = ashr <vscale x 2 x i4> %a, %b
+  =>
+%r = ashr <vscale x 2 x i4> %a, %b

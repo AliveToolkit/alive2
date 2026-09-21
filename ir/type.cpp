@@ -6,6 +6,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <cassert>
 #include <charconv>
@@ -1110,9 +1111,12 @@ void ArrayType::print(ostream &os) const {
 }
 
 
-VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(std::move(name), false) {
+VectorType::VectorType(string &&name, unsigned elements, Type &elementTy,
+                       bool scalable)
+  : AggregateType(std::move(name), false), scalable(scalable) {
   assert(elements != 0);
+  if (scalable)
+    elements *= util::config::vscale_value;
   this->elements = elements;
   defined = true;
   children.resize(elements, &elementTy);
@@ -1199,8 +1203,13 @@ expr VectorType::enforceVectorType(
 }
 
 void VectorType::print(ostream &os) const {
-  if (elements)
-    os << '<' << elements << " x " << *children[0] << '>';
+  if (!elements)
+    return;
+  os << '<';
+  if (scalable)
+    os << "vscale:" << util::config::vscale_value << " x ";
+  os << (scalable ? elements / util::config::vscale_value : elements)
+     << " x " << *children[0] << '>';
 }
 
 

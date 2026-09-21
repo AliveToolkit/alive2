@@ -1,0 +1,15 @@
+; TEST-ARGS: -vscale:1
+; CHECK: <vscale:1 x 2 x i4>
+; ERROR: Target is more poisonous than source for i4 %r
+
+; Same transformation as scalablevector2.opt, which runs it at vscale 2.
+; The number of lanes follows vscale, so at vscale 1 this type has only two
+; lanes, lane 3 is out of range, and the target is poison.
+
+Name: insert and extract at lane 3
+
+%t = insertelement <vscale x 2 x i4> %vec, i4 %x, i64 0
+%r = extractelement <vscale x 2 x i4> %t, i64 0
+=>
+%u = insertelement <vscale x 2 x i4> %vec, i4 %x, i64 3
+%r = extractelement <vscale x 2 x i4> %u, i64 3

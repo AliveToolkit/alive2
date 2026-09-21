@@ -143,7 +143,7 @@ struct tokenizer_t {
   }
 
   bool isVectorType() {
-    return peek() == VECTOR_TYPE_PREFIX;
+    return peek() == VECTOR_TYPE_PREFIX || peek() == SCALABLE_VECTOR_TYPE_PREFIX;
   }
 
   bool isArrayType() {
@@ -369,15 +369,17 @@ static Type& parse_scalar_type() {
 }
 
 static Type& parse_vector_type() {
-  tokenizer.ensure(VECTOR_TYPE_PREFIX);
+  bool scalable = tokenizer.consumeIf(SCALABLE_VECTOR_TYPE_PREFIX);
+
+  if (!scalable)
+    tokenizer.ensure(VECTOR_TYPE_PREFIX);
+
   unsigned elements = yylval.num;
-
   Type &elemTy = parse_scalar_type();
-
   tokenizer.ensure(CSGT);
   return *vector_types.emplace_back(
     make_unique<VectorType>("vty_" + to_string(vector_types.size()),
-                            elements, elemTy)).get();
+                            elements, elemTy, scalable)).get();
 }
 
 static Type& parse_array_type();
@@ -1373,6 +1375,7 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FLOAT:
   case DOUBLE:
   case VECTOR_TYPE_PREFIX:
+  case SCALABLE_VECTOR_TYPE_PREFIX:
   case LBRACE:
   case NUM:
   case FP_NUM:
