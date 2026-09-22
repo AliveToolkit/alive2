@@ -380,8 +380,6 @@ static Type& parse_vector_type() {
   Type &elemTy = parse_scalar_type();
   tokenizer.ensure(CSGT);
 
-  // A scalable vector is realized at the configured vscale, so its element
-  // count can exceed what the SMT encoding holds even when the minimum can't.
   uint64_t count = elements;
   if (scalable)
     count *= util::config::vscale_value;

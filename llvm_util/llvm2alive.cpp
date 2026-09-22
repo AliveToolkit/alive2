@@ -605,7 +605,8 @@ public:
     }
 
     auto typesz = DL().getTypeAllocSize(i.getAllocatedType());
-    if (typesz.isScalable()) // TODO: scalable vectors not supported
+    // TODO: scalable alloca
+    if (typesz.isScalable())
       return error(i);
 
     auto size = make_intconst(typesz, 64);
