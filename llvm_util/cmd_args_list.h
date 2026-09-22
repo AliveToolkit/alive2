@@ -185,4 +185,10 @@ llvm::cl::opt<bool> opt_disallow_ub_exploitation(
   llvm::cl::desc("Disallow UB exploitation by optimizations (default=allow)"),
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
+llvm::cl::opt<unsigned> opt_single_vscale(LLVM_ARGS_PREFIX "single-vscale",
+  llvm::cl::desc("Check scalable vectors at this one concrete vscale, "
+                 "which must be a power of two (default=2)"),
+  llvm::cl::init(2), llvm::cl::value_desc("value"),
+  llvm::cl::cat(alive_cmdargs));
+
 }

@@ -24,6 +24,13 @@ config::debug = opt_debug;
 config::quiet = opt_quiet;
 config::max_offset_bits = opt_max_offset_in_bits;
 config::max_sizet_bits  = opt_max_sizet_in_bits;
+if (opt_single_vscale == 0 ||
+    (opt_single_vscale & (opt_single_vscale - 1)) != 0) {
+  cerr << "Alive2: " LLVM_ARGS_PREFIX
+          "single-vscale must be a positive power of two!" << endl;
+  exit(1);
+}
+config::vscale_value = opt_single_vscale;
 
 if ((config::disallow_ub_exploitation = opt_disallow_ub_exploitation)) {
   config::disable_undef_input = true;

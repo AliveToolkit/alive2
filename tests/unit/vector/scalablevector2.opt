@@ -1,4 +1,4 @@
-; TEST-ARGS: -vscale:2
+; TEST-ARGS: -single-vscale:2
 ; CHECK: <vscale:2 x 2 x i4>
 ; CHECK: Transformation seems to be correct!
 
