@@ -27,7 +27,7 @@ config::quiet = opt_quiet;
 config::max_offset_bits = opt_max_offset_in_bits;
 config::max_sizet_bits  = opt_max_sizet_in_bits;
 
-if (!std::has_single_bit(opt_single_vscale)) {
+if (!std::has_single_bit(unsigned(opt_single_vscale))) {
   cerr << "Alive2: " LLVM_ARGS_PREFIX
           "single-vscale must be a positive power of two!" << endl;
   exit(1);
