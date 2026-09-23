@@ -18,6 +18,8 @@ namespace smt { class Model; }
 
 namespace IR {
 
+static constexpr unsigned max_vector_elements = 65535;
+
 class AggregateType;
 class FloatType;
 class IntType;

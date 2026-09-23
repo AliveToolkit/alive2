@@ -4,9 +4,11 @@
 #include "tools/alive_parser.h"
 #include "ir/constant.h"
 #include "ir/precondition.h"
+#include "ir/type.h"
 #include "ir/value.h"
 #include "tools/alive_lexer.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <cassert>
 #include <memory>
 #include <unordered_map>
@@ -377,6 +379,15 @@ static Type& parse_vector_type() {
   unsigned elements = yylval.num;
   Type &elemTy = parse_scalar_type();
   tokenizer.ensure(CSGT);
+
+  uint64_t count = elements;
+  if (scalable)
+    count *= util::config::vscale_value;
+  if (count == 0 || count > max_vector_elements)
+    error("Vector type must have between 1 and " +
+          to_string(max_vector_elements) + " elements; got: " +
+          to_string(count));
+
   return *vector_types.emplace_back(
     make_unique<VectorType>("vty_" + to_string(vector_types.size()),
                             elements, elemTy, scalable)).get();

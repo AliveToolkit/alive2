@@ -1,4 +1,4 @@
-; TEST-ARGS: -vscale:1
+; TEST-ARGS: -single-vscale:1
 ; CHECK: <vscale:1 x 2 x i4>
 ; ERROR: Target is more poisonous than source for i4 %r
 
