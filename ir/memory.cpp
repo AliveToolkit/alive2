@@ -2332,6 +2332,18 @@ Memory::alloc(const expr *size, uint64_t align, BlockKind blockKind,
     state->addQuantVar(nondet_nonnull);
     allocated = precond && (nonnull || (nooverflow && nondet_nonnull));
   }
+
+  // Create a new symbolic variable that represents errno if the allocation
+  // fails.
+  if (blockKind == MALLOC || blockKind == CXX_NEW) {
+    expr errno_on_failure = expr::mkFreshVar("#malloc_errno",
+                                             expr::mkUInt(0, 32));
+
+    expr current_errno = state->getErrno();
+    expr new_errno = expr::mkIf(allocated, current_errno, errno_on_failure);
+    state->setErrno(std::move(new_errno));
+  }
+
   return { std::move(p).release(), std::move(allocated) };
 }
 

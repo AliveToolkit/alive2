@@ -1892,7 +1892,7 @@ public:
                 MemoryAccess::Inaccessible),
       make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Other),
       make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Globals),
-      make_pair(llvm::IRMemLocation::Other,           MemoryAccess::Errno),
+      make_pair(llvm::IRMemLocation::ErrnoMem,        MemoryAccess::Errno),
     };
 
     for (auto &[ef, ty] : tys) {
