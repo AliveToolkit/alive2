@@ -42,8 +42,15 @@ FloatType quad_type("fp128", FloatType::Quad);
 FloatType bfloat_type("bfloat", FloatType::BFloat);
 
 // cache complex types
-unordered_map<const llvm::Type*, unique_ptr<Type>> type_cache;
+// A scalable type has a different concrete size at each vscale, so it is
+// cached per scale. Other types are shared under key 0.
+unordered_map<const llvm::Type*, unordered_map<unsigned, unique_ptr<Type>>>
+  type_cache;
 unsigned type_id_counter; // for unnamed types
+
+unique_ptr<Type>& cached_type(const llvm::Type *ty) {
+  return type_cache[ty][ty->isScalableTy() ? util::config::vscale_value : 0];
+}
 
 Function *current_fn;
 unordered_map<const llvm::Value*, Value*> value_cache;
@@ -166,7 +173,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     if (strty->isScalableTy())
       return nullptr;
 
-    auto &cache = type_cache[ty];
+    auto &cache = cached_type(ty);
     if (!cache) {
       vector<Type*> elems;
       vector<bool> is_padding;
@@ -211,7 +218,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
   }
   case llvm::Type::FixedVectorTyID:
   case llvm::Type::ScalableVectorTyID: {
-    auto &cache = type_cache[ty];
+    auto &cache = cached_type(ty);
     if (!cache) {
       auto vty = cast<llvm::VectorType>(ty);
       auto elems = vty->getElementCount().getKnownMinValue();
@@ -231,7 +238,7 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     return cache.get();
   }
   case llvm::Type::ArrayTyID: {
-    auto &cache = type_cache[ty];
+    auto &cache = cached_type(ty);
     if (!cache) {
       auto aty = cast<llvm::ArrayType>(ty);
       auto elemty = aty->getElementType();

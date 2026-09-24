@@ -337,7 +337,7 @@ public:
 
 
 class VectorType final : public AggregateType {
-  bool scalable = false;
+  unsigned vscale_value = 0;
 
 public:
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}

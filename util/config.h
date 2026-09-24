@@ -46,8 +46,8 @@ extern unsigned max_offset_bits;
 // size and size of pointers (not to be confused with program pointer size).
 extern unsigned max_sizet_bits;
 
-// Concrete vscale used to give scalable vector types a fixed number of
-// elements.
+// Concrete vscale used while translating scalable vectors and llvm.vscale.
+// The type solver selects the values checked by alive-tv.
 extern unsigned vscale_value;
 
 std::ostream &dbg();

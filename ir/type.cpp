@@ -1114,10 +1114,11 @@ void ArrayType::print(ostream &os) const {
 
 VectorType::VectorType(string &&name, unsigned elements, Type &elementTy,
                        bool scalable)
-  : AggregateType(std::move(name), false), scalable(scalable) {
+  : AggregateType(std::move(name), false),
+    vscale_value(scalable ? util::config::vscale_value : 0) {
   assert(elements != 0);
   if (scalable)
-    elements *= util::config::vscale_value;
+    elements *= vscale_value;
   this->elements = elements;
   defined = true;
   children.resize(elements, &elementTy);
@@ -1207,9 +1208,9 @@ void VectorType::print(ostream &os) const {
   if (!elements)
     return;
   os << '<';
-  if (scalable)
-    os << "vscale:" << util::config::vscale_value << " x ";
-  os << (scalable ? elements / util::config::vscale_value : elements)
+  if (vscale_value)
+    os << "vscale:" << vscale_value << " x ";
+  os << (vscale_value ? elements / vscale_value : elements)
      << " x " << *children[0] << '>';
 }
 

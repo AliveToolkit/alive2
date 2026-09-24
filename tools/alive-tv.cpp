@@ -6,6 +6,7 @@
 #include "llvm_util/llvm2alive.h"
 #include "llvm_util/llvm_optimizer.h"
 #include "llvm_util/utils.h"
+#include "llvm_util/vscale.h"
 #include "smt/smt.h"
 #include "tools/transform.h"
 #include "util/version.h"
@@ -40,6 +41,7 @@ using namespace llvm_util;
 #define LLVM_ARGS_PREFIX ""
 #define ARGS_SRC_TGT
 #define ARGS_REFINEMENT
+#define ARGS_VSCALE_LOOP
 #include "llvm_util/cmd_args_list.h"
 
 namespace {
@@ -70,6 +72,56 @@ llvm::cl::opt<string>
                            "https://llvm.org/docs/NewPassManager.html#invoking-opt"),
             llvm::cl::cat(alive_cmdargs), llvm::cl::init("O2"));
 
+bool compareFunctions(Verifier &verifier, llvm::Function &src,
+                      llvm::Function &tgt) {
+  // The no-vscale case.
+  if (!referencesVScale(src) && !referencesVScale(tgt))
+    return verifier.compareFunctions(src, tgt);
+
+  // Enumerate the scales the source's range admits (either range's, when
+  // checking both directions), limited to those the options select.
+  bool single = opt_single_vscale.getNumOccurrences();
+  auto scales = getVScales(src, tgt, verifier.bidirectional,
+                           single ? opt_single_vscale : 1,
+                           single ? opt_single_vscale : opt_max_vscale);
+  if (!scales || scales->empty()) {
+    *out << (scales ? "ERROR: No vscale values to check\n\n"
+                    : "ERROR: Could not enumerate vscale values\n\n");
+    ++verifier.num_failed;
+    return true;
+  }
+
+  // A target range cannot exclude scales the source admits; when checking
+  // both directions, neither side may exclude the other's.
+  for (unsigned scale : *scales) {
+    auto v = smt::expr::mkUInt(scale, 32);
+    bool src_ok = vscaleInRange(src, v).isTrue();
+    if (!src_ok || !vscaleInRange(tgt, v).isTrue()) {
+      *out << "ERROR: " << (src_ok ? "Target" : "Source")
+           << " vscale_range excludes vscale = " << scale << "\n\n";
+      ++verifier.num_unsound;
+      return false;
+    }
+  }
+
+  for (unsigned scale : *scales) {
+    TmpValueChange vscale(config::vscale_value, scale);
+    if (!config::quiet)
+      *out << "Checking vscale = " << scale << endl;
+
+    // A scale that errors, fails, or is unsound is already counted; a correct
+    // one is counted once for the whole pair, below.
+    unsigned correct = verifier.num_correct;
+    if (!verifier.compareFunctions(src, tgt))
+      return false;
+    if (verifier.num_correct == correct)
+      return true;
+    verifier.num_correct = correct;
+  }
+
+  ++verifier.num_correct;
+  return true;
+}
 
 }
 
@@ -180,7 +232,7 @@ and "tgt5" will unused.
       auto TGT = findFunction(*M1, DstFName);
       if (SRC && TGT) {
         ++Cnt;
-        if (!verifier.compareFunctions(*SRC, *TGT))
+        if (!compareFunctions(verifier, *SRC, *TGT))
           if (opt_error_fatal)
             goto end;
       }
@@ -243,7 +295,7 @@ and "tgt5" will unused.
         continue;
       F2 = I->second;
     }
-    if (!verifier.compareFunctions(F1, *F2))
+    if (!compareFunctions(verifier, F1, *F2))
       if (opt_error_fatal)
         goto end;
   }

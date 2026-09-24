@@ -116,6 +116,19 @@ Or using the opt wrapper:
 ~/alive2/build/opt-alive-test.sh -passes=instcombine foo.ll
 ```
 
+When either function uses scalable vectors or references
+`llvm.vscale`, alive-tv checks -- by default -- refinement at `vscale`
+values 1, 2, 4, and 8. To change the (inclusive) ceiling, use the
+`--max-vscale=N` command line argument. To check only a single
+power-of-two vscale value, use `--single-vscale=N`. These options
+cannot be combined.
+
+Scales outside the source function's `vscale_range` attribute are skipped. If
+the target's `vscale_range` excludes a scale that the source allows, the
+transformation is reported as unsound; with `--bidirectional`, each function's
+range must admit every scale the other's does. No query is ever run at a scale
+that either range excludes.
+
 
 Translation validation of a single LLVM unit test, using lit:
 ```

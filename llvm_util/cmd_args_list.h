@@ -186,9 +186,22 @@ llvm::cl::opt<bool> opt_disallow_ub_exploitation(
   llvm::cl::init(false), llvm::cl::cat(alive_cmdargs));
 
 llvm::cl::opt<unsigned> opt_single_vscale(LLVM_ARGS_PREFIX "single-vscale",
+#ifdef ARGS_VSCALE_LOOP
+  llvm::cl::desc("Check scalable vectors only at this one concrete vscale, "
+                 "which must be a power of two (default: check every scale "
+                 "up to max-vscale)"),
+#else
   llvm::cl::desc("Check scalable vectors at this one concrete vscale, "
                  "which must be a power of two (default=2)"),
+#endif
   llvm::cl::init(2), llvm::cl::value_desc("value"),
   llvm::cl::cat(alive_cmdargs));
+#ifdef ARGS_VSCALE_LOOP
+llvm::cl::opt<unsigned> opt_max_vscale(LLVM_ARGS_PREFIX "max-vscale",
+  llvm::cl::desc("Check power-of-two vscale values up to this inclusive maximum "
+                 "(default=8)"),
+  llvm::cl::init(8), llvm::cl::value_desc("value"),
+  llvm::cl::cat(alive_cmdargs));
+#endif
 
 }
