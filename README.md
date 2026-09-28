@@ -401,7 +401,8 @@ which outputs the command passed to `opt`.  Note that this may interfere
 with tests which check output.
 * The script also accepts a `--no-timeout` option, which disables the `opt`
 process timeout.  This timeout is not supported on Macintosh.  To change the
-SMT timeout, instead pass an `-smt-to:` option to the `alive` executable.
+SMT timeout, instead pass an `-smt-to:` option to the `alive` executable, or
+`--smt-to=` to the `alive-tv` executable.
 
 LLVM Bugs Found by Alive2
 -------------------------
