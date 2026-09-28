@@ -189,6 +189,8 @@ void BinOp::print(ostream &os) const {
   case Clmul:         str = "clmul "; break;
   case PExt:          str = "pext "; break;
   case PDep:          str = "pdep "; break;
+  case UMulH:         str = "umulh "; break;
+  case SMulH:         str = "smulh "; break;
   }
 
   os << getName() << " = " << str;
@@ -489,6 +491,18 @@ StateValue BinOp::toSMT(State &s) const {
   case PDep:
     fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
       return {a.pdep(b), ap && bp};
+    };
+    break;
+  case UMulH:
+    fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
+      auto bw = a.bits();
+      return {(a.zext(bw) * b.zext(bw)).extract(2*bw - 1, bw), ap && bp};
+    };
+    break;
+  case SMulH:
+    fn = [&](auto &a, auto &ap, auto &b, auto &bp) -> StateValue {
+      auto bw = a.bits();
+      return {(a.sext(bw) * b.sext(bw)).extract(2*bw - 1, bw), ap && bp};
     };
     break;
   }
@@ -851,11 +865,14 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
   }
 
   if (!bitwise && val.isFloat()) {
+    const FloatType &ty = to_ty ? *to_ty->getAsFloatType() : fpty;
+    // the denormal mode is per-type, so the flushing of the result is governed
+    // by the mode of the result's type rather than that of the operands; these
+    // differ for casts between floating-point types
     val = handle_subnormal(s,
-                           s.getFn().getFnAttrs().getFPDenormal(from_ty).output,
+                           s.getFn().getFnAttrs().getFPDenormal(ty).output,
                            std::move(val),
                            /*mandatory=*/false);
-    const FloatType &ty = to_ty ? *to_ty->getAsFloatType() : fpty;
     val = ty.fromFloat(s, val, fpty, nary, a, b, c);
   }
 

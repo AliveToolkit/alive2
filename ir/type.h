@@ -18,6 +18,8 @@ namespace smt { class Model; }
 
 namespace IR {
 
+static constexpr unsigned max_vector_elements = 65535;
+
 class AggregateType;
 class FloatType;
 class IntType;
@@ -335,9 +337,12 @@ public:
 
 
 class VectorType final : public AggregateType {
+  bool scalable = false;
+
 public:
   VectorType(std::string &&name) : AggregateType(std::move(name)) {}
-  VectorType(std::string &&name, unsigned elements, Type &elementTy);
+  VectorType(std::string &&name, unsigned elements, Type &elementTy,
+             bool scalable = false);
 
   IR::StateValue extract(const IR::StateValue &vector,
                          const smt::expr &index) const;

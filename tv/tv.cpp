@@ -545,7 +545,7 @@ bool is_terminate_pass(const llvm::StringRef &pass0) {
 }
 
 
-struct TVPass : public llvm::detail::PassInfoMixin<TVPass> {
+struct TVPass : public llvm::RequiredPassInfoMixin<TVPass> {
   static string batched_pass_begin_name;
   static bool batch_started;
   // # of run passes when batching is enabled
@@ -681,7 +681,8 @@ void runTVPass(Ty &M) {
   tv.run(M, get_TLI);
 }
 
-struct ClangTVFinalizePass : public llvm::detail::PassInfoMixin<ClangTVFinalizePass> {
+struct ClangTVFinalizePass
+    : public llvm::RequiredPassInfoMixin<ClangTVFinalizePass> {
   llvm::PreservedAnalyses run(llvm::Module &M,
                               llvm::ModuleAnalysisManager &AM) {
     if (is_clangtv) {

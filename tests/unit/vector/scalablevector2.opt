@@ -1,0 +1,15 @@
+; TEST-ARGS: -single-vscale:2
+; CHECK: <vscale:2 x 2 x i4>
+; CHECK: Transformation seems to be correct!
+
+; Same transformation as scalablevector3.opt, which runs it at vscale 1.
+; The number of lanes follows vscale, so at vscale 2 this type has four lanes,
+; lane 3 exists, and the transformation is correct.
+
+Name: insert and extract at lane 3
+
+%t = insertelement <vscale x 2 x i4> %vec, i4 %x, i64 0
+%r = extractelement <vscale x 2 x i4> %t, i64 0
+=>
+%u = insertelement <vscale x 2 x i4> %vec, i4 %x, i64 3
+%r = extractelement <vscale x 2 x i4> %u, i64 3

@@ -105,6 +105,11 @@ space+ {
   return INT_TYPE;
 }
 
+"<vscale" space* "x" space* @tag1 [1-9][0-9]* space* "x" {
+  yylval.num = strtoull((char*)tag1, nullptr, 10);
+  return SCALABLE_VECTOR_TYPE_PREFIX;
+}
+
 "<" space* @tag1 [1-9][0-9]* space* "x" {
   yylval.num = strtoull((char*)tag1, nullptr, 10);
   return VECTOR_TYPE_PREFIX;
@@ -289,6 +294,8 @@ space+ {
 "clmul" { return CLMUL; }
 "pext" { return PEXT; }
 "pdep" { return PDEP; }
+"umulh" { return UMULH; }
+"smulh" { return SMULH; }
 "oeq" { return OEQ; }
 "ogt" { return OGT; }
 "oge" { return OGE; }

@@ -6,6 +6,7 @@
 #include "ir/state.h"
 #include "smt/solver.h"
 #include "util/compiler.h"
+#include "util/config.h"
 #include <array>
 #include <cassert>
 #include <charconv>
@@ -19,7 +20,8 @@ using namespace std;
 
 static constexpr unsigned var_type_bits = 3;
 static constexpr unsigned var_bw_bits = 11;
-static constexpr unsigned var_vector_elements = 16;
+static constexpr unsigned var_elements_bits = 16;
+static_assert(IR::max_vector_elements == (1u << var_elements_bits) - 1);
 
 
 namespace IR {
@@ -807,8 +809,8 @@ AggregateType::AggregateType(string &&name, vector<Type*> &&vchildren,
 }
 
 expr AggregateType::numElements() const {
-  return defined ? expr::mkUInt(elements, var_vector_elements) :
-                   var("elements", var_vector_elements);
+  return defined ? expr::mkUInt(elements, var_elements_bits) :
+                   var("elements", var_elements_bits);
 }
 
 unsigned AggregateType::numPaddingsConst() const {
@@ -1110,9 +1112,12 @@ void ArrayType::print(ostream &os) const {
 }
 
 
-VectorType::VectorType(string &&name, unsigned elements, Type &elementTy)
-  : AggregateType(std::move(name), false) {
+VectorType::VectorType(string &&name, unsigned elements, Type &elementTy,
+                       bool scalable)
+  : AggregateType(std::move(name), false), scalable(scalable) {
   assert(elements != 0);
+  if (scalable)
+    elements *= util::config::vscale_value;
   this->elements = elements;
   defined = true;
   children.resize(elements, &elementTy);
@@ -1199,8 +1204,13 @@ expr VectorType::enforceVectorType(
 }
 
 void VectorType::print(ostream &os) const {
-  if (elements)
-    os << '<' << elements << " x " << *children[0] << '>';
+  if (!elements)
+    return;
+  os << '<';
+  if (scalable)
+    os << "vscale:" << util::config::vscale_value << " x ";
+  os << (scalable ? elements / util::config::vscale_value : elements)
+     << " x " << *children[0] << '>';
 }
 
 

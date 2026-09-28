@@ -46,6 +46,10 @@ extern unsigned max_offset_bits;
 // size and size of pointers (not to be confused with program pointer size).
 extern unsigned max_sizet_bits;
 
+// Concrete vscale used to give scalable vector types a fixed number of
+// elements.
+extern unsigned vscale_value;
+
 std::ostream &dbg();
 void set_debug(std::ostream &os);
 

@@ -4,6 +4,8 @@
 #include "llvm_util/utils.h"
 #include "ir/constant.h"
 #include "ir/function.h"
+#include "ir/type.h"
+#include "util/config.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -159,6 +161,11 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     if (strty->isOpaque())
       return get_int_type(8);
 
+    // If there's a scalable struct member, return early since
+    // otherwise getStructLayout() will assert out
+    if (strty->isScalableTy())
+      return nullptr;
+
     auto &cache = type_cache[ty];
     if (!cache) {
       vector<Type*> elems;
@@ -202,8 +209,8 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     }
     return cache.get();
   }
-  // TODO: non-fixed sized vectors
-  case llvm::Type::FixedVectorTyID: {
+  case llvm::Type::FixedVectorTyID:
+  case llvm::Type::ScalableVectorTyID: {
     auto &cache = type_cache[ty];
     if (!cache) {
       auto vty = cast<llvm::VectorType>(ty);
@@ -211,8 +218,15 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       auto ety = llvm_type2alive(vty->getElementType());
       if (!ety || elems > 1024)
         return nullptr;
+      uint64_t count = elems;
+      if (vty->isScalableTy())
+        count *= util::config::vscale_value;
+      if (!count || count > max_vector_elements) {
+        *out << "ERROR: Vector type is too large\n";
+        return nullptr;
+      }
       cache = make_unique<VectorType>("ty_" + to_string(type_id_counter++),
-                                      elems, *ety);
+                                      elems, *ety, vty->isScalableTy());
     }
     return cache.get();
   }
@@ -298,7 +312,7 @@ Value* get_operand(llvm::Value *v,
     return nullptr;
 
   // automatic splat of constant values
-  if (auto vty = dyn_cast<llvm::FixedVectorType>(v->getType());
+  if (auto vty = dyn_cast<llvm::VectorType>(v->getType());
       vty && isa<llvm::ConstantInt, llvm::ConstantFP>(v)) {
     llvm::Value *llvm_splat = nullptr;
     if (auto cnst = dyn_cast<llvm::ConstantInt>(v)) {
@@ -315,7 +329,7 @@ Value* get_operand(llvm::Value *v,
     if (!splat)
       return nullptr;
 
-    vector<Value*> vals(vty->getNumElements(), splat);
+    vector<Value*> vals(ty->getAsAggregateType()->numElementsConst(), splat);
     auto val = make_unique<AggregateValue>(*ty, std::move(vals));
     auto ret = val.get();
     current_fn->addConstant(std::move(val));

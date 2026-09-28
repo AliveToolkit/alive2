@@ -36,6 +36,8 @@ static void show_help() {
           " -skip-smt\t\tSkip all SMT queries\n"
           " -disable-poison-input\tAssume input variables can never be poison\n"
           " -disable-undef-input\tAssume input variables can never be undef\n"
+          " -single-vscale:x\tCheck scalable vectors at this one concrete vscale,\n"
+          "\t\t\ta power of two (default: 2)\n"
           " -h / --help / -v / --version\tShow this help\n";
 }
 
@@ -76,6 +78,15 @@ int main(int argc, char **argv) {
       config::disable_undef_input = true;
     else if (arg == "-disable-poison-input")
       config::disable_poison_input = true;
+    else if (arg.compare(0, 15, "-single-vscale:") == 0 && arg.size() > 15) {
+      config::vscale_value = strtoul(arg.substr(15).data(), nullptr, 10);
+      if (config::vscale_value == 0 ||
+          (config::vscale_value & (config::vscale_value - 1)) != 0) {
+        cerr << "single-vscale must be a positive power of two!\n\n";
+        show_help();
+        return -1;
+      }
+    }
     else if (arg == "-h" || arg == "--help" || arg == "-v" ||
              arg == "--version") {
       show_help();
@@ -119,7 +130,8 @@ int main(int argc, char **argv) {
         TransformVerify tv(t, !root_only);
         auto types = tv.getTypings();
         if (!types) {
-          cerr << "Doesn't type check!\n";
+          cerr << (types.hasError() ? "Could not solve typing constraints\n"
+                                    : "Doesn't type check!\n");
           continue;
         }
 
@@ -135,6 +147,10 @@ int main(int argc, char **argv) {
             break;
           }
           cout << "\rDone: " << ++i << flush;
+        }
+        if (types.hasError()) {
+          cerr << "Could not solve typing constraints\n";
+          correct = false;
         }
         cout << '\n';
         if (correct)
