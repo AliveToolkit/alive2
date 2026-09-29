@@ -728,18 +728,20 @@ static expr any_fp_zero(State &s, expr v) {
   return expr::mkIf(var && is_zero, v.fneg(), v);
 }
 
-static expr handle_subnormal(State &s, FPDenormalAttrs::Type attr, expr &&v) {
+static expr handle_subnormal(State &s, FPDenormalAttrs::Type attr, expr &&v,
+                             bool mandatory) {
   auto nondet = [&]() { return s.getFreshNondetVar("subnormal", true); };
+  auto flush = [&]() { return mandatory ? expr(true) : nondet(); };
   expr subnormal = v.isFPSubNormal();
 
   switch (attr) {
   case FPDenormalAttrs::IEEE:
     break;
   case FPDenormalAttrs::PositiveZero:
-    v = expr::mkIf(subnormal && nondet(), expr::mkNumber("0", v), v);
+    v = expr::mkIf(subnormal && flush(), expr::mkNumber("0", v), v);
     break;
   case FPDenormalAttrs::PreserveSign:
-    v = expr::mkIf(subnormal && nondet(),
+    v = expr::mkIf(subnormal && flush(),
                    expr::mkIf(v.isFPNegative(),
                               expr::mkNumber("-0", v),
                               expr::mkNumber("0", v)),
@@ -816,11 +818,11 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
 
   if (!bitwise) {
     auto fpdenormal = s.getFn().getFnAttrs().getFPDenormal(from_ty).input;
-    fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a));
+    fp_a = handle_subnormal(s, fpdenormal, std::move(fp_a), /*mandatory=*/true);
     if (nary >= 2)
-      fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b));
+      fp_b = handle_subnormal(s, fpdenormal, std::move(fp_b), /*mandatory=*/true);
     if (nary >= 3)
-      fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c));
+      fp_c = handle_subnormal(s, fpdenormal, std::move(fp_c), /*mandatory=*/true);
   }
 
   function<expr(const expr&)> fn_rm
@@ -869,7 +871,8 @@ static StateValue fm_poison(State &s, expr a, const expr &ap, expr b,
     // differ for casts between floating-point types
     val = handle_subnormal(s,
                            s.getFn().getFnAttrs().getFPDenormal(ty).output,
-                           std::move(val));
+                           std::move(val),
+                           /*mandatory=*/false);
     val = ty.fromFloat(s, val, fpty, nary, a, b, c);
   }
 
