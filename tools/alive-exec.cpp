@@ -192,7 +192,7 @@ void exec(llvm::Function &F, llvm::TargetLibraryInfoWrapperPass &TLI,
   int64_t n;
   auto ret = exec(F, TLI);
   ret_val_poison = ret.non_poison.isFalse();
-  ret_val = ret.value.isInt(n) ? (int)n : -1;
+  ret_val = ret.value.isBV() && ret.value.isInt(n) ? (int)n : -1;
 }
 }
 
