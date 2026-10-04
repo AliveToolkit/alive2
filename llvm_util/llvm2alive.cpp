@@ -1625,10 +1625,7 @@ public:
         attrs.set(ParamAttrs::ByVal);
         auto ty = aset.getByValType();
         auto asz = DL().getTypeAllocSize(ty);
-        auto size = asz.getKnownMinValue();
-        if (asz.isScalable())
-          size *= uint64_t(config::vscale_value);
-        attrs.blockSize = max(attrs.blockSize, size);
+        attrs.blockSize = max(attrs.blockSize, asz.getFixedValue());
 
         attrs.set(ParamAttrs::Align);
         attrs.align = max(attrs.align, DL().getABITypeAlign(ty).value());

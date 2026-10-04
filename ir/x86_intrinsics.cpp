@@ -196,13 +196,7 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
   case x86_avx512_psllv_q_512:
   case x86_avx512_psllv_w_128:
   case x86_avx512_psllv_w_256:
-  case x86_avx512_psllv_w_512:
-  case x86_sse2_pmulh_w:
-  case x86_avx2_pmulh_w:
-  case x86_avx512_pmulh_w_512:
-  case x86_sse2_pmulhu_w:
-  case x86_avx2_pmulhu_w:
-  case x86_avx512_pmulhu_w_512: {
+  case x86_avx512_psllv_w_512: {
     expr (*fn)(const expr &, const expr &);
     switch (op) {
     case x86_sse2_pavg_w:
@@ -270,20 +264,6 @@ StateValue X86IntrinBinOp::toSMT(State &s) const {
     case x86_avx512_psllv_w_512:
       fn = [](auto a, auto b) {
         return expr::mkIf(b.uge(a.bits()), expr::mkUInt(0, a), a << b);
-      };
-      break;
-    case x86_sse2_pmulh_w:
-    case x86_avx2_pmulh_w:
-    case x86_avx512_pmulh_w_512:
-      fn = [](auto a, auto b) {
-        return (a.sext(16) * b.sext(16)).extract(31, 16);
-      };
-      break;
-    case x86_sse2_pmulhu_w:
-    case x86_avx2_pmulhu_w:
-    case x86_avx512_pmulhu_w_512:
-      fn = [](auto a, auto b) {
-        return (a.zext(16) * b.zext(16)).extract(31, 16);
       };
       break;
     default:
