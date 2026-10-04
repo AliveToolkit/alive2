@@ -16,6 +16,6 @@ define i1 @tgt(ptr %a, ptr %b) {
 
 !0 = !{!1}
 !1 = distinct !{!1, !2}
-!2 = distinct !{!2, !"LVerDomain"}
+!2 = distinct !{!2, i1 false, !"LVerDomain"}
 !3 = !{!4}
 !4 = distinct !{!4, !2}
