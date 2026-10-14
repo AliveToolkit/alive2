@@ -605,11 +605,11 @@ public:
     }
 
     auto typesz = DL().getTypeAllocSize(i.getAllocatedType());
-    // TODO: scalable alloca
+    auto allocsz = typesz.getKnownMinValue();
     if (typesz.isScalable())
-      return error(i);
+      allocsz *= uint64_t(config::vscale_value);
 
-    auto size = make_intconst(typesz, 64);
+    auto size = make_intconst(allocsz, 64);
     auto alloc = make_unique<Alloc>(*ty, value_name(i), *size, mul,
                       pref_alignment(i, i.getAllocatedType()));
     allocs.emplace(&i, alloc.get());
