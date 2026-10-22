@@ -40,7 +40,7 @@ string optimize_module(llvm::Module &M, string_view optArgs) {
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
-  PassBuilder PB(TM.get());
+  PassBuilder PB(M.getContext(), TM.get());
   ModulePassManager MPM;
 
   PB.registerModuleAnalyses(MAM);
