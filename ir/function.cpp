@@ -1201,9 +1201,16 @@ void LoopAnalysis::run() {
   // Construct the loop forest (0 or more loop trees)
   for (unsigned i = 0; i < bb_count; ++i) {
     auto h = header[i];
+    // Give every loop header a key of its own. A header only ever acquires one
+    // as a side effect of a body block naming it as parent, so a loop whose
+    // body is just the header itself (a self loop) would otherwise be absent
+    // from the forest and consumers walking it top-down would not see a loop
+    // there at all.
+    if (type[i] != nonheader)
+      (void)forest[node[i]];
+
     if (h == 0 && type[i] != nonheader) {
       roots.emplace_back(node[i]);
-      (void)forest[node[i]];
     }
     else if (h != 0 || type[i] != nonheader) {
       parent.emplace(node[i], node[h]);
