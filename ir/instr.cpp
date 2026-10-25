@@ -1886,7 +1886,7 @@ StateValue ConversionOp::toSMT(State &s) const {
     break;
   case BitCast:
     // NOP: ptr vect -> ptr vect
-    if (getType().isVectorType() &&
+    if (getType().isVectorType() && val->getType().isVectorType() &&
         getType().getAsAggregateType()->getChild(0).isPtrType())
       return v;
 
