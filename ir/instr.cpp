@@ -669,8 +669,8 @@ void FpBinOp::print(ostream &os) const {
   case FMul:     str = "fmul "; break;
   case FDiv:     str = "fdiv "; break;
   case FRem:     str = "frem "; break;
-  case FMax:     str = "fmax "; break;
-  case FMin:     str = "fmin "; break;
+  case FMaxnum:  str = "fmaxnum "; break;
+  case FMinnum:  str = "fminnum "; break;
   case FMaximum: str = "fmaximum "; break;
   case FMinimum: str = "fminimum "; break;
   case FMaximumnum: str = "fmaximumnum "; break;
@@ -947,10 +947,10 @@ StateValue FpBinOp::toSMT(State &s) const {
     };
     break;
 
-  case FMin:
-  case FMax:
+  case FMinnum:
+  case FMaxnum:
     fn = [&](const expr &a, const expr &b, const expr &rm) {
-      return fmin_fmax(s, a, b, rm, op == FMin);
+      return fmin_fmax(s, a, b, rm, op == FMinnum);
     };
     break;
 
