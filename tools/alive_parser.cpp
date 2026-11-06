@@ -691,8 +691,8 @@ static unsigned parse_binop_flags(token op_token) {
   case FMUL:
   case FDIV:
   case FREM:
-  case FMAX:
-  case FMIN:
+  case FMAXNUM:
+  case FMINNUM:
   case FMAXIMUM:
   case FMINIMUM:
   case FMAXIMUMNUM:
@@ -827,8 +827,8 @@ static unique_ptr<Instr> parse_fp_binop(string_view name, token op_token) {
   case FMUL:     op = FpBinOp::FMul; break;
   case FDIV:     op = FpBinOp::FDiv; break;
   case FREM:     op = FpBinOp::FRem; break;
-  case FMAX:     op = FpBinOp::FMax; break;
-  case FMIN:     op = FpBinOp::FMin; break;
+  case FMAXNUM:  op = FpBinOp::FMaxnum; break;
+  case FMINNUM:  op = FpBinOp::FMinnum; break;
   case FMAXIMUM: op = FpBinOp::FMaximum; break;
   case FMINIMUM: op = FpBinOp::FMinimum; break;
   case FMAXIMUMNUM: op = FpBinOp::FMaximumnum; break;
@@ -1307,8 +1307,8 @@ static unique_ptr<Instr> parse_instr(string_view name) {
   case FMUL:
   case FDIV:
   case FREM:
-  case FMAX:
-  case FMIN:
+  case FMAXNUM:
+  case FMINNUM:
   case FMAXIMUM:
   case FMINIMUM:
   case FMAXIMUMNUM:

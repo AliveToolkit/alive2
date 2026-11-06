@@ -6,4 +6,4 @@ Name: t0
 %cmp = fcmp olt float %v0, %v1
 %r = select i1 %cmp, float %v0, float %v1
 
-; ERROR: Target's return value is more undefined for float %r
+; ERROR: Value mismatch for float %r

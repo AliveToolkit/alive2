@@ -1,89 +1,69 @@
-Name: fmax, constant prop.
-%t = fmax float 1.0, float 3.0
+Name: fmaxnum, constant prop.
+%t = fmaxnum float 1.0, float 3.0
   =>
 %t = float 3.0
 
-Name: fmin, constant prop.
-%t = fmin float 1.0, float 3.0
+Name: fminnum, constant prop.
+%t = fminnum float 1.0, float 3.0
   =>
 %t = float 1.0
 
-Name: fmax, LHS NaN
+Name: fmaxnum, LHS NaN
 %v = fdiv float 0.0, 0.0
-%t = fmax float %v, float 3.0
+%t = fmaxnum float %v, float 3.0
   =>
 %t = float 3.0
 
-Name: fmax, RHS NaN
+Name: fmaxnum, RHS NaN
 %v = fdiv float 0.0, 0.0
-%t = fmax float 3.0, float %v
+%t = fmaxnum float 3.0, float %v
   =>
 %t = float 3.0
 
-Name: fmax, BOTH NaN
+Name: fmaxnum, BOTH NaN
 %v = fdiv float 0.0, 0.0
-%t = fmax float %v, float %v
+%t = fmaxnum float %v, float %v
   =>
 %v = fdiv float 0.0, 0.0
 %t = float %v
 
 
-Name: fmin, LHS NaN
+Name: fminnum, LHS NaN
 %v = fdiv float 0.0, 0.0
-%t = fmin float %v, float 3.0
+%t = fminnum float %v, float 3.0
   =>
 %t = float 3.0
 
-Name: fmin, RHS NaN
+Name: fminnum, RHS NaN
 %v = fdiv float 0.0, 0.0
-%t = fmin float 3.0, float %v
+%t = fminnum float 3.0, float %v
   =>
 %t = float 3.0
 
-Name: fmin, BOTH NaN
+Name: fminnum, BOTH NaN
 %v = fdiv float 0.0, 0.0
-%t = fmin float %v, float %v
+%t = fminnum float %v, float %v
   =>
 %v = fdiv float 0.0, 0.0
 %t = float %v
 
-Name: fmax, nondet
-%t = fmax float +0.0, float -0.0
+Name: fmaxnum, +0, -0
+%t = fmaxnum float +0.0, float -0.0
   =>
 %t = float +0.0
 
-Name: fmax, nondet
-%t = fmax float +0.0, float -0.0
+Name: fmaxnum, -0, +0
+%t = fmaxnum float -0.0, float +0.0
+  =>
+%t = float +0.0
+
+Name: fminnum, +0, -0
+%t = fminnum float +0.0, float -0.0
   =>
 %t = float -0.0
 
-Name: fmax, nondet
-%t = fmax float -0.0, float +0.0
-  =>
-%t = float +0.0
-
-Name: fmax, nondet
-%t = fmax float -0.0, float +0.0
-  =>
-%t = float -0.0
-
-Name: fmin, nondet
-%t = fmin float +0.0, float -0.0
-  =>
-%t = float +0.0
-
-Name: fmin, nondet
-%t = fmin float +0.0, float -0.0
-  =>
-%t = float -0.0
-
-Name: fmin, nondet
-%t = fmin float -0.0, float +0.0
-  =>
-%t = float +0.0
-
-Name: fmin, nondet
-%t = fmin float -0.0, float +0.0
+Name: fminnum, -0, +0
+%t = fminnum float -0.0, float +0.0
   =>
 %t = float -0.0
 
