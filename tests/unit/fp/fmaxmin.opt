@@ -47,42 +47,22 @@ Name: fminnum, BOTH NaN
 %v = fdiv float 0.0, 0.0
 %t = float %v
 
-Name: fmaxnum, nondet
+Name: fmaxnum, +0, -0
 %t = fmaxnum float +0.0, float -0.0
   =>
 %t = float +0.0
 
-Name: fmaxnum, nondet
-%t = fmaxnum float +0.0, float -0.0
-  =>
-%t = float -0.0
-
-Name: fmaxnum, nondet
+Name: fmaxnum, -0, +0
 %t = fmaxnum float -0.0, float +0.0
   =>
 %t = float +0.0
 
-Name: fmaxnum, nondet
-%t = fmaxnum float -0.0, float +0.0
-  =>
-%t = float -0.0
-
-Name: fminnum, nondet
-%t = fminnum float +0.0, float -0.0
-  =>
-%t = float +0.0
-
-Name: fminnum, nondet
+Name: fminnum, +0, -0
 %t = fminnum float +0.0, float -0.0
   =>
 %t = float -0.0
 
-Name: fminnum, nondet
-%t = fminnum float -0.0, float +0.0
-  =>
-%t = float +0.0
-
-Name: fminnum, nondet
+Name: fminnum, -0, +0
 %t = fminnum float -0.0, float +0.0
   =>
 %t = float -0.0
