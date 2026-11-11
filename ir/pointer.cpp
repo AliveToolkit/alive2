@@ -867,8 +867,12 @@ expr Pointer::fninputRefined(const Pointer &other, set<expr> &undef,
 
   expr nonlocal = is_asm ? getAddress() == other.getAddress() : *this == other;
 
-  return expr::mkIf(isNull(), other.isNull(),
-                    expr::mkIf(d1 && p1l.isLocal(), local, nonlocal));
+  return expr::mkIf(
+      isNull(), other.isNull(),
+      // allow log(0, offset) -> phy(offset), as in refined()
+      expr::mkIf(isLogical() && !other.isLogical() && !is_asm && getBid() == 0,
+                 getAddress() == other.getAddress(),
+                 expr::mkIf(d1 && p1l.isLocal(), local, nonlocal)));
 }
 
 expr Pointer::isWritable() const {
