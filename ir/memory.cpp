@@ -797,7 +797,7 @@ int Memory::AliasSet::isFullUpToAlias(bool islocal) const {
       break;
   }
   for (unsigned i2 = i, e = v.size(); i2 != e; ++i2) {
-    if (v[i])
+    if (v[i2])
       return -1;
   }
   return i - 1;
