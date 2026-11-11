@@ -1,3 +1,5 @@
+; TEST-ARGS: -disable-undef-input
+
 Name: scalable vector add - identity
 %r = add <vscale x 2 x i4> %a, %b
   =>
