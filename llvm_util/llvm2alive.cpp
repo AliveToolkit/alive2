@@ -566,7 +566,7 @@ public:
     auto *valty = &val->getType();
     for (auto idx : i.indices()) {
       auto *aty = valty->getAsAggregateType();
-      unsigned idx_with_paddings = aty->countPaddings(idx) + idx;
+      unsigned idx_with_paddings = aty->paddedIndex(idx);
       inst->addIdx(idx_with_paddings);
       valty = &aty->getChild(idx_with_paddings);
     }
@@ -585,7 +585,7 @@ public:
 
     for (auto idx : i.indices()) {
       auto *aty = ty->getAsAggregateType();
-      unsigned idx_with_paddings = aty->countPaddings(idx) + idx;
+      unsigned idx_with_paddings = aty->paddedIndex(idx);
       inst->addIdx(idx_with_paddings);
       ty = &aty->getChild(idx_with_paddings);
     }
