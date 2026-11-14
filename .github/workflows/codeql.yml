@@ -12,18 +12,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout
 
       - name: Install dependencies
         run: sudo apt-get install z3 re2c
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.39.3
+        uses: github/codeql-action/init
         with:
           languages: cpp
 
       - name: Build
-        uses: github/codeql-action/autobuild@v4.39.3
+        uses: github/codeql-action/autobuild
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.39.3
+        uses: github/codeql-action/analyze
