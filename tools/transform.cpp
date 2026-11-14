@@ -90,11 +90,11 @@ static void print_single_varval(ostream &os, State &st, const Model &m,
   }
 }
 
-void tools::print_model_val(ostream &os, State &st, const Model &m,
-                            const Value *var, const Type &type,
-                            const StateValue &val, unsigned child) {
+static void print_model_val_impl(ostream &os, State &st, const Model &m,
+                                 const Value *var, const Type &type,
+                                 const StateValue &val, unsigned &next_child) {
   if (!type.isAggregateType()) {
-    print_single_varval(os, st, m, var, type, val, child);
+    print_single_varval(os, st, m, var, type, val, next_child++);
     return;
   }
 
@@ -103,10 +103,18 @@ void tools::print_model_val(ostream &os, State &st, const Model &m,
   for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
     if (i != 0)
       os << ", ";
-    tools::print_model_val(os, st, m, var, agg->getChild(i),
-                           agg->extract(val, i), child + i);
+    unsigned padding_child = 0;
+    print_model_val_impl(os, st, m, agg->isPadding(i) ? nullptr : var,
+                          agg->getChild(i), agg->extract(val, i),
+                          agg->isPadding(i) ? padding_child : next_child);
   }
   os << (type.isStructType() ? " }" : " >");
+}
+
+void tools::print_model_val(ostream &os, State &st, const Model &m,
+                            const Value *var, const Type &type,
+                            const StateValue &val, unsigned child) {
+  print_model_val_impl(os, st, m, var, type, val, child);
 }
 
 
@@ -363,14 +371,16 @@ static bool error(Errors &errs, State &src_state, State &tgt_state,
 
 
 static void instantiate_undef(const Input *in, map<expr, expr> &instances,
-                              const Type &ty, unsigned child) {
+                              const Type &ty, unsigned &next_child) {
   if (auto agg = ty.getAsAggregateType()) {
     for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
       if (!agg->isPadding(i))
-        instantiate_undef(in, instances, agg->getChild(i), child + i);
+        instantiate_undef(in, instances, agg->getChild(i), next_child);
     }
     return;
   }
+
+  unsigned child = next_child++;
 
   // Bail out if it gets too big. It's unlikely we can solve it anyway.
   if (instances.size() >= 128 || hit_half_memory_limit())
@@ -450,8 +460,10 @@ static expr preprocess(const Transform &t, const set<expr> &qvars0,
   map<expr, expr> instances({ { std::move(e), true } });
 
   for (auto &i : t.src.getInputs()) {
-    if (auto in = dynamic_cast<const Input*>(&i))
-      instantiate_undef(in, instances, i.getType(), 0);
+    if (auto in = dynamic_cast<const Input*>(&i)) {
+      unsigned next_child = 0;
+      instantiate_undef(in, instances, i.getType(), next_child);
+    }
   }
 
   expr insts(false);
