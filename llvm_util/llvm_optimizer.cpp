@@ -12,7 +12,6 @@ using namespace std;
 
 static void init_llvm_targets() {
   static bool initialized = false;
-  static codegen::RegisterCodeGenFlags CFG;
   if (initialized)
     return;
 

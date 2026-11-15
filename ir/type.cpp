@@ -824,6 +824,18 @@ unsigned AggregateType::countPaddings(unsigned to_idx) const {
   return count;
 }
 
+unsigned AggregateType::paddedIndex(unsigned idx) const {
+  unsigned seen = 0;
+  for (unsigned i = 0; i < elements; ++i) {
+    if (is_padding[i])
+      continue;
+    if (seen == idx)
+      return i;
+    ++seen;
+  }
+  UNREACHABLE();
+}
+
 expr AggregateType::numElementsExcludingPadding() const {
   auto elems = numElements();
   return numElements() - expr::mkInt(numPaddingsConst(), elems);
