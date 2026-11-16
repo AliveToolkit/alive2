@@ -211,18 +211,19 @@ string Input::getSMTName(unsigned child) const {
   return smt_name;
 }
 
-StateValue Input::mkInput(State &s, const Type &ty, unsigned child) const {
+StateValue Input::mkInput(State &s, const Type &ty, unsigned &next_child) const {
   if (auto agg = ty.getAsAggregateType()) {
     vector<StateValue> vals;
     for (unsigned i = 0, e = agg->numElementsConst(); i < e; ++i) {
       if (agg->isPadding(i))
         continue;
-      auto name = getSMTName(child + i);
-      vals.emplace_back(mkInput(s, agg->getChild(i), child + i));
+      vals.emplace_back(mkInput(s, agg->getChild(i), next_child));
     }
     return agg->aggregateVals(vals);
   }
 
+  // Number non-padding scalar leaves in depth-first order.
+  unsigned child = next_child++;
   expr val;
   if (hasAttribute(ParamAttrs::ByVal)) {
     unsigned bid;
@@ -275,7 +276,8 @@ bool Input::isUndefMask(const expr &e) {
 }
 
 StateValue Input::toSMT(State &s) const {
-  return mkInput(s, getType(), 0);
+  unsigned next_child = 0;
+  return mkInput(s, getType(), next_child);
 }
 
 void Input::merge(const ParamAttrs &other) {

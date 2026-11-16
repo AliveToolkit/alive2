@@ -119,7 +119,7 @@ class Input final : public Value {
   std::string smt_name;
   ParamAttrs attrs;
   std::string getSMTName(unsigned child) const;
-  StateValue mkInput(State &s, const Type &ty, unsigned child) const;
+  StateValue mkInput(State &s, const Type &ty, unsigned &next_child) const;
 public:
   Input(Type &type, std::string &&name);
   void setAttributes(ParamAttrs &&new_attrs);
