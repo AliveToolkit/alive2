@@ -1844,6 +1844,13 @@ expr expr::ult(uint64_t rhs) const {
   return ult(mkUInt(rhs, *this));
 }
 
+expr expr::ult_extend(uint64_t rhs) const {
+  C();
+  if ((unsigned)bit_width(rhs) > bits())
+    return true;
+  return ult(rhs);
+}
+
 expr expr::uge(uint64_t rhs) const {
   return uge(mkUInt(rhs, *this));
 }
