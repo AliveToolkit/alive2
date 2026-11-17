@@ -314,6 +314,7 @@ public:
   expr ule(uint64_t rhs) const;
   expr ule_extend(uint64_t rhs) const;
   expr ult(uint64_t rhs) const;
+  expr ult_extend(uint64_t rhs) const;
   expr uge(uint64_t rhs) const;
   expr ugt(uint64_t rhs) const;
   expr sle(int64_t rhs) const;
