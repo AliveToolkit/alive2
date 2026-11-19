@@ -1025,9 +1025,9 @@ public:
       switch (i.getIntrinsicID()) {
       case llvm::Intrinsic::copysign:                         op = FpBinOp::CopySign; break;
       case llvm::Intrinsic::minnum:
-      case llvm::Intrinsic::experimental_constrained_minnum:  op = FpBinOp::FMin; break;
+      case llvm::Intrinsic::experimental_constrained_minnum:  op = FpBinOp::FMinnum; break;
       case llvm::Intrinsic::maxnum:
-      case llvm::Intrinsic::experimental_constrained_maxnum:  op = FpBinOp::FMax; break;
+      case llvm::Intrinsic::experimental_constrained_maxnum:  op = FpBinOp::FMaxnum; break;
       case llvm::Intrinsic::minimum:
       case llvm::Intrinsic::experimental_constrained_minimum: op = FpBinOp::FMinimum; break;
       case llvm::Intrinsic::maximum:
