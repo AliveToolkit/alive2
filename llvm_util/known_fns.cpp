@@ -45,6 +45,7 @@ static bool implict_attrs_(llvm::LibFunc libfn, FnAttrs &attrs,
   auto alloc_fns = [&](unsigned idx1, unsigned idx2 = -1u) {
     ret_and_args_no_undef();
     attrs.mem.setCanOnlyAccess(MemoryAccess::Inaccessible);
+    attrs.mem.setCanAlsoWrite(MemoryAccess::Errno);
     attrs.set(FnAttrs::NoAlias);
     attrs.set(FnAttrs::WillReturn);
     attrs.set(FnAttrs::AllocSize);
