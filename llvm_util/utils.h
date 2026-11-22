@@ -16,6 +16,7 @@ class ConstantExpr;
 class DataLayout;
 class Instruction;
 class Type;
+class TypeSize;
 class Value;
 class Module;
 class LLVMContext;
@@ -31,6 +32,9 @@ class Value;
 }
 
 namespace llvm_util {
+
+// Evaluate a fixed or scalable size at the configured vscale.
+uint64_t getConcreteSize(llvm::TypeSize size);
 
 IR::FastMathFlags parse_fmath(llvm::Instruction &i);
 

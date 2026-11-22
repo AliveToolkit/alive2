@@ -672,10 +672,7 @@ public:
         continue;
       }
 
-      auto stride = I.getSequentialElementStride(DL());
-      auto size = stride.getKnownMinValue();
-      if (stride.isScalable())
-        size *= uint64_t(config::vscale_value);
+      auto size = getConcreteSize(I.getSequentialElementStride(DL()));
       gep->addIdx(size, *op);
     }
     return gep;
