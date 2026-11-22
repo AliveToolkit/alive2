@@ -1,7 +1,6 @@
-; TEST-ARGS: -disable-undef-input
-
 ; The fixed-size struct stores four bytes and has an eight-byte allocation
 ; size. Its array stride must include the allocation padding only once.
+
 target datalayout = "e-p:64:64-a:64"
 %pair = type { <2 x i8>, <2 x i8> }
 
@@ -17,7 +16,6 @@ define <2 x i8> @tgt_array(ptr %p) {
   ret <2 x i8> %r
 }
 
-; A standalone store must preserve the byte immediately after its store size.
 define i8 @src_store() {
   ret i8 42
 }

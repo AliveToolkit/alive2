@@ -187,7 +187,6 @@ Type* llvm_type2alive(const llvm::Type *ty) {
           continue;
 
         auto ofs = getConcreteSize(layout->getElementOffset(i));
-        // Round to bytes after evaluating vscale, including for i1 vectors.
         auto sz = llvm::divideCeil(getConcreteSize(DL->getTypeSizeInBits(e)), 8);
         auto ofs_next = getConcreteSize(i + 1 == strty->getNumElements() ?
                 layout->getSizeInBytes() :

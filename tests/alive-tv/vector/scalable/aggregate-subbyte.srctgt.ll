@@ -1,4 +1,4 @@
-; TEST-ARGS: --single-vscale=4 -disable-undef-input
+; TEST-ARGS: --single-vscale=4
 
 %triple = type { <vscale x 2 x i1>, <vscale x 2 x i1>, <vscale x 2 x i1> }
 

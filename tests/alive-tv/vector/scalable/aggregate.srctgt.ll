@@ -1,6 +1,3 @@
-; TEST-ARGS: -disable-undef-input
-
-; Neither the mixed struct nor the containing array/struct has a memory layout.
 %mixed = type { <vscale x 2 x i8>, i32 }
 %nested = type { [2 x %mixed] }
 

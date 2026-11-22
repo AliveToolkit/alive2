@@ -1,4 +1,4 @@
-; TEST-ARGS: --single-vscale=4 -disable-undef-input
+; TEST-ARGS: --single-vscale=4
 
 ; Each vector has eight bytes of data and a sixteen-byte allocation size.
 target datalayout = "e-p:64:64-v16:32"

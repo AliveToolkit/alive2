@@ -1,4 +1,4 @@
-; TEST-ARGS: --single-vscale=2 -disable-undef-input
+; TEST-ARGS: --single-vscale=2
 ; ERROR: Value mismatch
 
 target datalayout = "e-p:64:64-a:64"

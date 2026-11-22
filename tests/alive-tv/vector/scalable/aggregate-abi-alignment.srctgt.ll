@@ -1,7 +1,8 @@
-; TEST-ARGS: --single-vscale=2 -disable-undef-input
+; TEST-ARGS: --single-vscale=2
 
 ; At vscale=2, the struct stores eight bytes but has a sixteen-byte allocation
 ; size. The array must add the eight bytes of allocation padding exactly once.
+
 target datalayout = "e-p:64:64-a:64"
 %pair = type { <vscale x 2 x i8>, <vscale x 2 x i8> }
 
@@ -17,8 +18,6 @@ define <vscale x 2 x i8> @tgt_array(ptr %p) {
   ret <vscale x 2 x i8> %r
 }
 
-; Put the store on the target side so poisoning the byte after the struct's
-; store size fails refinement instead of making the source less defined.
 define i8 @src_store() {
   ret i8 42
 }
