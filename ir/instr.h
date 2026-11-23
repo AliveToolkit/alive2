@@ -1348,11 +1348,6 @@ public:
 };
 
 
-// llvm.vector.interleaveN / llvm.vector.deinterleaveN
-// interleave:   N vectors of M lanes -> one vector of N*M lanes,
-//               res[i*N + k] = ops[k][i]
-// deinterleave: one vector of N*M lanes -> struct of N vectors of M lanes,
-//               res.k[i] = op[i*N + k]
 class VectorInterleave final : public Instr {
 public:
   enum Op { Interleave, Deinterleave };

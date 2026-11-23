@@ -5271,7 +5271,6 @@ vector<Value*> VectorInterleave::operands() const {
 }
 
 bool VectorInterleave::propagatesPoison() const {
-  // lane permutation: poison only flows to the corresponding lanes
   return false;
 }
 
@@ -5280,9 +5279,8 @@ bool VectorInterleave::hasSideEffects() const {
 }
 
 void VectorInterleave::rauw(const Value &what, Value &with) {
-  for (auto &v : ops) {
+  for (auto &v : ops)
     RAUW(v);
-  }
 }
 
 void VectorInterleave::print(ostream &os) const {
@@ -5308,20 +5306,20 @@ StateValue VectorInterleave::toSMT(State &s) const {
       }
     }
     return getType().getAsAggregateType()->aggregateVals(vals);
-  }
-
-  auto *retty = getType().getAsAggregateType();
-  auto &in = s[*ops[0]];
-  unsigned m = inty->numElementsConst() / factor;
-  for (unsigned k = 0; k != factor; ++k) {
-    vector<StateValue> lanes;
-    for (unsigned i = 0; i != m; ++i) {
-      lanes.emplace_back(inty->extract(in, i * factor + k));
+  } else {
+    auto *retty = getType().getAsAggregateType();
+    auto &in = s[*ops[0]];
+    unsigned m = inty->numElementsConst() / factor;
+    for (unsigned k = 0; k != factor; ++k) {
+      vector<StateValue> lanes;
+      for (unsigned i = 0; i != m; ++i) {
+        lanes.emplace_back(inty->extract(in, i * factor + k));
+      }
+      auto &childty = retty->getChild(retty->paddedIndex(k));
+      vals.emplace_back(childty.getAsAggregateType()->aggregateVals(lanes));
     }
-    auto &childty = retty->getChild(retty->paddedIndex(k));
-    vals.emplace_back(childty.getAsAggregateType()->aggregateVals(lanes));
+    return retty->aggregateVals(vals);
   }
-  return retty->aggregateVals(vals);
 }
 
 expr VectorInterleave::getTypeConstraints(const Function &f) const {
