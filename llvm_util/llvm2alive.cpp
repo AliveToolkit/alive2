@@ -10,6 +10,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/MemoryBuiltins.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/Analysis/VectorUtils.h"
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/GetElementPtrTypeIterator.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -1257,6 +1258,46 @@ public:
         return error(i);
       ret = make_unique<UnaryOp>(*ty, value_name(i), *val, UnaryOp::Copy);
       break;
+    }
+    case llvm::Intrinsic::vector_interleave2:
+    case llvm::Intrinsic::vector_interleave3:
+    case llvm::Intrinsic::vector_interleave4:
+    case llvm::Intrinsic::vector_interleave5:
+    case llvm::Intrinsic::vector_interleave6:
+    case llvm::Intrinsic::vector_interleave7:
+    case llvm::Intrinsic::vector_interleave8:
+    case llvm::Intrinsic::vector_deinterleave2:
+    case llvm::Intrinsic::vector_deinterleave3:
+    case llvm::Intrinsic::vector_deinterleave4:
+    case llvm::Intrinsic::vector_deinterleave5:
+    case llvm::Intrinsic::vector_deinterleave6:
+    case llvm::Intrinsic::vector_deinterleave7:
+    case llvm::Intrinsic::vector_deinterleave8: {
+      auto id = i.getIntrinsicID();
+      unsigned factor = llvm::getInterleaveIntrinsicFactor(id);
+      auto op = VectorInterleave::Interleave;
+      if (factor == 0) {
+        factor = llvm::getDeinterleaveIntrinsicFactor(id);
+        op = VectorInterleave::Deinterleave;
+      }
+      assert(factor >= 2);
+
+      auto ty = llvm_type2alive(i.getType());
+      if (!ty)
+        return error(i);
+      vector<Value*> args;
+      for (auto &arg : i.args()) {
+        auto *a = get_operand(arg);
+        if (!a)
+          return error(i);
+        args.emplace_back(a);
+      }
+      for (unsigned idx = 0; idx < args.size(); ++idx) {
+        if (i.paramHasAttr(idx, llvm::Attribute::NoUndef))
+          BB->addInstr(make_unique<Assume>(*args[idx], Assume::WellDefined));
+      }
+      return make_unique<VectorInterleave>(*ty, value_name(i), std::move(args),
+                                           factor, op);
     }
 
     // do nothing intrinsics

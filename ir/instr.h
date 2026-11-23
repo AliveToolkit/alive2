@@ -1348,6 +1348,40 @@ public:
 };
 
 
+// llvm.vector.interleaveN / llvm.vector.deinterleaveN
+// interleave:   N vectors of M lanes -> one vector of N*M lanes,
+//               res[i*N + k] = ops[k][i]
+// deinterleave: one vector of N*M lanes -> struct of N vectors of M lanes,
+//               res.k[i] = op[i*N + k]
+class VectorInterleave final : public Instr {
+public:
+  enum Op { Interleave, Deinterleave };
+
+private:
+  std::vector<Value*> ops;
+  unsigned factor;
+  Op op;
+
+public:
+  VectorInterleave(Type &type, std::string &&name, std::vector<Value*> &&ops,
+                   unsigned factor, Op op)
+    : Instr(type, std::move(name)), ops(std::move(ops)), factor(factor),
+      op(op) {}
+
+  Op getOp() const { return op; }
+  unsigned getFactor() const { return factor; }
+  std::vector<Value*> operands() const override;
+  bool propagatesPoison() const override;
+  bool hasSideEffects() const override;
+  void rauw(const Value &what, Value &with) override;
+  void print(std::ostream &os) const override;
+  StateValue toSMT(State &s) const override;
+  smt::expr getTypeConstraints(const Function &f) const override;
+  std::unique_ptr<Instr>
+    dup(Function &f, const std::string &suffix) const override;
+};
+
+
 const ConversionOp *isCast(ConversionOp::Op op, const Value &v);
 Value *isNoOp(const Value &v);
 }
