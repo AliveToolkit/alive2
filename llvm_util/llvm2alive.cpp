@@ -1604,8 +1604,10 @@ public:
                         Value **val, bool is_callsite) {
     bool precise = true;
     for (const llvm::Attribute &llvmattr : aset) {
-      if (!llvmattr.isEnumAttribute() && !llvmattr.isIntAttribute() &&
-          !llvmattr.isTypeAttribute())
+      // String attributes have no enum kind, so skip them. Every other kind
+      // must reach the switch, including the constant range ones (range and
+      // initializes).
+      if (llvmattr.isStringAttribute())
         continue;
 
       switch (llvmattr.getKindAsEnum()) {
