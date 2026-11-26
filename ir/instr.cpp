@@ -5149,7 +5149,7 @@ void ExtractElement::print(ostream &os) const {
 StateValue ExtractElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = static_cast<const VectorType*>(v->getType().getAsAggregateType());
-  expr inbounds = iv.ult(vty->numElementsConst());
+  expr inbounds = iv.ult_extend(vty->numElementsConst());
   auto [rv, rp] = vty->extract(s[*v], iv);
   return { std::move(rv), ip && inbounds && rp };
 }
@@ -5191,7 +5191,7 @@ void InsertElement::print(ostream &os) const {
 StateValue InsertElement::toSMT(State &s) const {
   auto &[iv, ip] = s[*idx];
   auto vty = static_cast<const VectorType*>(v->getType().getAsAggregateType());
-  expr inbounds = iv.ult(vty->numElementsConst());
+  expr inbounds = iv.ult_extend(vty->numElementsConst());
   auto [rv, rp] = vty->update(s[*v], s[*e], iv);
   return { std::move(rv), expr::mkIf(ip && inbounds, std::move(rp),
                                 vty->getDummyValue(false).non_poison) };
