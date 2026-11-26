@@ -5266,6 +5266,100 @@ unique_ptr<Instr> ShuffleVector::dup(Function &f, const string &suffix) const {
 }
 
 
+vector<Value*> VectorInterleave::operands() const {
+  return ops;
+}
+
+bool VectorInterleave::propagatesPoison() const {
+  return false;
+}
+
+bool VectorInterleave::hasSideEffects() const {
+  return false;
+}
+
+void VectorInterleave::rauw(const Value &what, Value &with) {
+  for (auto &v : ops)
+    RAUW(v);
+}
+
+void VectorInterleave::print(ostream &os) const {
+  os << getName() << " = "
+     << (op == Interleave ? "vector_interleave" : "vector_deinterleave")
+     << factor;
+  bool first = true;
+  for (auto *v : ops) {
+    os << (first ? " " : ", ") << print_type(v->getType()) << v->getName();
+    first = false;
+  }
+}
+
+StateValue VectorInterleave::toSMT(State &s) const {
+  auto *inty = ops[0]->getType().getAsAggregateType();
+  vector<StateValue> vals;
+
+  if (op == Interleave) {
+    unsigned m = inty->numElementsConst();
+    for (unsigned i = 0; i != m; ++i) {
+      for (unsigned k = 0; k != factor; ++k) {
+        vals.emplace_back(inty->extract(s[*ops[k]], i));
+      }
+    }
+    return getType().getAsAggregateType()->aggregateVals(vals);
+  } else {
+    auto *retty = getType().getAsAggregateType();
+    auto &in = s[*ops[0]];
+    unsigned m = inty->numElementsConst() / factor;
+    for (unsigned k = 0; k != factor; ++k) {
+      vector<StateValue> lanes;
+      for (unsigned i = 0; i != m; ++i) {
+        lanes.emplace_back(inty->extract(in, i * factor + k));
+      }
+      auto &childty = retty->getChild(retty->paddedIndex(k));
+      vals.emplace_back(childty.getAsAggregateType()->aggregateVals(lanes));
+    }
+    return retty->aggregateVals(vals);
+  }
+}
+
+expr VectorInterleave::getTypeConstraints(const Function &f) const {
+  auto &inty = ops[0]->getType();
+  auto c = Value::getTypeConstraints() && inty.enforceVectorType();
+
+  auto times_factor = [this](const Type &ty) {
+    auto n = ty.getAsAggregateType()->numElements();
+    return n * expr::mkUInt(factor, n);
+  };
+
+  if (op == Interleave) {
+    for (auto *v : ops) {
+      c &= v->getType() == inty;
+    }
+    return c &&
+           getType().enforceVectorTypeSameChildTy(inty) &&
+           getType().getAsAggregateType()->numElements() == times_factor(inty);
+  }
+
+  c &= getType().enforceStructType();
+  if (auto *ty = getType().getAsStructType()) {
+    c &= ty->numElementsExcludingPadding() == factor;
+    auto &child0 = ty->getChild(ty->paddedIndex(0));
+    c &= child0.enforceVectorTypeSameChildTy(inty) &&
+         inty.getAsAggregateType()->numElements() == times_factor(child0);
+    for (unsigned k = 1; k < factor; ++k) {
+      c &= ty->getChild(ty->paddedIndex(k)) == child0;
+    }
+  }
+  return c;
+}
+
+unique_ptr<Instr>
+VectorInterleave::dup(Function &f, const string &suffix) const {
+  return make_unique<VectorInterleave>(getType(), getName() + suffix,
+                                       vector<Value*>(ops), factor, op);
+}
+
+
 const ConversionOp* isCast(ConversionOp::Op op, const Value &v) {
   auto c = dynamic_cast<const ConversionOp*>(&v);
   return (c && c->getOp() == op) ? c : nullptr;
