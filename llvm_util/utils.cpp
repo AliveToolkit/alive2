@@ -72,6 +72,11 @@ bool hasOpaqueType(llvm::Type *ty) {
 
 namespace llvm_util {
 
+uint64_t getConcreteSize(llvm::TypeSize size) {
+  return size.getKnownMinValue() *
+         (size.isScalable() ? util::config::vscale_value : 1);
+}
+
 FastMathFlags parse_fmath(llvm::Instruction &i) {
   FastMathFlags fmath;
   if (auto op = dyn_cast<llvm::FPMathOperator>(&i)) {
@@ -161,37 +166,31 @@ Type* llvm_type2alive(const llvm::Type *ty) {
     if (strty->isOpaque())
       return get_int_type(8);
 
-    // If there's a scalable struct member, return early since
-    // otherwise getStructLayout() will assert out
-    if (strty->isScalableTy())
-      return nullptr;
-
     auto &cache = type_cache[ty];
     if (!cache) {
       vector<Type*> elems;
       vector<bool> is_padding;
-      auto layout = DL->getStructLayout(const_cast<llvm::StructType *>(strty));
+      // Unsized scalable aggregates are SSA values with no memory layout.
+      auto layout = strty->isSized() ?
+        DL->getStructLayout(const_cast<llvm::StructType *>(strty)) : nullptr;
+      if (!layout && !strty->isScalableTy())
+        return nullptr;
       for (unsigned i = 0; i < strty->getNumElements(); ++i) {
         auto e = strty->getElementType(i);
-        auto ofs = layout->getElementOffset(i);
-        auto sz = DL->getTypeStoreSize(e);
-
-        // TODO: support vscale
-        if (ofs.isScalable() || sz.isScalable())
-          return nullptr;
-
         if (auto ty = llvm_type2alive(e)) {
           elems.push_back(ty);
           is_padding.push_back(false);
         } else
           return nullptr;
 
-        auto ofs_next = i + 1 == strty->getNumElements() ?
-                DL->getTypeAllocSize(const_cast<llvm::StructType *>(strty)) :
-                layout->getElementOffset(i + 1);
-        // TODO: support vscale
-        if (ofs_next.isScalable())
-          return nullptr;
+        if (!layout)
+          continue;
+
+        auto ofs = getConcreteSize(layout->getElementOffset(i));
+        auto sz = llvm::divideCeil(getConcreteSize(DL->getTypeSizeInBits(e)), 8);
+        auto ofs_next = getConcreteSize(i + 1 == strty->getNumElements() ?
+                layout->getSizeInBytes() :
+                layout->getElementOffset(i + 1));
         assert(ofs + sz <= ofs_next);
 
         if (ofs_next != ofs + sz) {
@@ -240,13 +239,21 @@ Type* llvm_type2alive(const llvm::Type *ty) {
       if (!ety || elems > 100 * 1024)
         return nullptr;
 
-      auto sz_with_padding = DL->getTypeAllocSize(elemty);
-      auto sz = DL->getTypeStoreSize(elemty);
-      assert(DL->getTypeAllocSize(const_cast<llvm::ArrayType *>(aty)) ==
-             elems * sz_with_padding);
-      Type *paddingTy = sz == sz_with_padding ? 0 :
-          llvm_type2alive(llvm::IntegerType::get(aty->getContext(),
-                                                 8 * (sz_with_padding - sz)));
+      Type *paddingTy = nullptr;
+      if (elemty->isSized()) {
+        auto sz_with_padding = getConcreteSize(DL->getTypeAllocSize(elemty));
+        auto sz = llvm::divideCeil(
+          getConcreteSize(DL->getTypeSizeInBits(elemty)), 8);
+        assert(getConcreteSize(DL->getTypeAllocSize(
+                 const_cast<llvm::ArrayType *>(aty))) == elems * sz_with_padding);
+        if (sz != sz_with_padding) {
+          paddingTy = llvm_type2alive(llvm::IntegerType::get(
+            aty->getContext(), 8 * (sz_with_padding - sz)));
+          if (!paddingTy)
+            return nullptr;
+        }
+      } else if (!elemty->isScalableTy())
+        return nullptr;
       cache = make_unique<ArrayType>("ty_" + to_string(type_id_counter++),
                                      elems, *ety, paddingTy);
     }

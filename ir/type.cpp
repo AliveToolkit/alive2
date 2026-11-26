@@ -7,6 +7,7 @@
 #include "smt/solver.h"
 #include "util/compiler.h"
 #include "util/config.h"
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <charconv>
@@ -814,14 +815,7 @@ expr AggregateType::numElements() const {
 }
 
 unsigned AggregateType::numPaddingsConst() const {
-  return is_padding.empty() ? 0 : countPaddings(is_padding.size() - 1);
-}
-
-unsigned AggregateType::countPaddings(unsigned to_idx) const {
-  unsigned count = 0;
-  for (unsigned i = 0; i <= to_idx; ++i)
-    count += is_padding[i];
-  return count;
+  return std::count(is_padding.begin(), is_padding.end(), true);
 }
 
 unsigned AggregateType::paddedIndex(unsigned idx) const {
