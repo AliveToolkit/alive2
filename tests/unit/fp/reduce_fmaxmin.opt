@@ -62,28 +62,14 @@ Name: reduce_fmin, BOTH NaN
 %v = fdiv float 0.0, 0.0
 %t = float %v
 
-Name: reduce_fmax, nondet (+0,-0) => +0
+Name: reduce_fmax, (+0,-0)
 %t0 = insertelement <2 x float> undef, float +0.0, i8 0
 %t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
 %t  = reduce_fmax <2 x float> %t1
   =>
 %t = float +0.0
 
-Name: reduce_fmax, nondet (+0,-0) => -0
-%t0 = insertelement <2 x float> undef, float +0.0, i8 0
-%t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
-%t  = reduce_fmax <2 x float> %t1
-  =>
-%t = float -0.0
-
-Name: reduce_fmin, nondet (+0,-0) => +0
-%t0 = insertelement <2 x float> undef, float +0.0, i8 0
-%t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
-%t  = reduce_fmin <2 x float> %t1
-  =>
-%t = float +0.0
-
-Name: reduce_fmin, nondet (+0,-0) => -0
+Name: reduce_fmin, (+0,-0)
 %t0 = insertelement <2 x float> undef, float +0.0, i8 0
 %t1 = insertelement <2 x float> %t0,  float -0.0, i8 1
 %t  = reduce_fmin <2 x float> %t1

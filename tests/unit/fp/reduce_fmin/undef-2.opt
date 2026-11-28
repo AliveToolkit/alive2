@@ -4,5 +4,5 @@ Name: t0
   =>
 %r = undef
 
-; ERROR: Target's return value is more undefined for float %r
+; ERROR: Value mismatch for float %r
 

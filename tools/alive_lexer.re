@@ -238,8 +238,8 @@ space+ {
 "smul_fix_sat" { return SMULFIXSAT; }
 "umul_fix_sat" { return UMULFIXSAT; }
 "fma" { return FMA; }
-"fmax" { return FMAX; }
-"fmin" { return FMIN; }
+"fmaxnum" { return FMAXNUM; }
+"fminnum" { return FMINNUM; }
 "fmaximum" { return FMAXIMUM; }
 "fminimum" { return FMINIMUM; }
 "fmaximumnum" { return FMAXIMUMNUM; }
